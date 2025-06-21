@@ -2,7 +2,7 @@
 using System.Net.Http.Headers;
 using System.Text.Json;
 
-namespace kDriveClient
+namespace kDriveClient.Helpers
 {
     public static class KDriveRequestFactory
     {

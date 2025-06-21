@@ -2,7 +2,7 @@
 using kDriveClient.Models.Exceptions;
 using System.Text.Json;
 
-namespace kDriveClient
+namespace kDriveClient.Helpers
 {
     /// <summary>
     /// KDriveJsonHelper provides methods to deserialize JSON responses from kDrive API.
@@ -37,8 +37,12 @@ namespace kDriveClient
         public static (string Token, string UploadUrl) ParseStartSessionResponse(string json)
         {
             var root = JsonSerializer.Deserialize<KDriveResponse>(json, _defaultOptions);
+            if (root == null || root.data == null)
+            {
+                throw new InvalidOperationException("Start session response is null or missing data");
+            }
 
-            if (!root.data.TryGetValue("token", out object tokenProp) || !root.data.TryGetValue("upload_url", out object urlProp))
+            if (!root.data.TryGetValue("token", out object? tokenProp) || !root.data.TryGetValue("upload_url", out object? urlProp))
             {
                 throw new InvalidOperationException("Start session response is missing required properties");
             }

@@ -1,4 +1,5 @@
-﻿using Microsoft.Extensions.Logging;
+﻿using kDriveClient.Helpers;
+using Microsoft.Extensions.Logging;
 
 namespace kDriveClient.kDriveClient
 {

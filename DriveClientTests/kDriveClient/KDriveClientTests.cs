@@ -1,5 +1,6 @@
 ﻿using kDriveClient.kDriveClient;
 using kDriveClient.Models;
+using kDriveClient.Models.Exceptions;
 using Microsoft.Extensions.Logging;
 using System.Net;
 
@@ -13,7 +14,7 @@ namespace kDriveClientTests.kDriveClient
         {
             var response = new HttpResponseMessage(HttpStatusCode.OK)
             {
-                Content = new StringContent("{\"id\":123,\"name\":\"example.txt\",\"path\":\"/Private/\",\"hash\":\"test\",\"mimetype\":\"text/text\"}")
+                Content = new StringContent("{\"result\":\"success\",\"data\":{\"id\":123,\"name\":\"example.txt\",\"path\":\"/Private/\",\"hash\":\"test\",\"mime_type\":\"text/text\"}}")
             };
 
             var handler = new FakeHttpMessageHandler(response);
@@ -34,6 +35,7 @@ namespace kDriveClientTests.kDriveClient
             Assert.AreEqual(HttpMethod.Post, handler.LastRequest.Method);
         }
     }
+
 
     public class FakeHttpMessageHandler(HttpResponseMessage fakeResponse) : HttpMessageHandler
     {

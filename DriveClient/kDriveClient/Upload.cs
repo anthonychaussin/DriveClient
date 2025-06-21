@@ -1,4 +1,5 @@
-﻿using kDriveClient.Models;
+﻿using kDriveClient.Helpers;
+using kDriveClient.Models;
 using Microsoft.Extensions.Logging;
 
 namespace kDriveClient.kDriveClient
@@ -74,7 +75,7 @@ namespace kDriveClient.kDriveClient
             }, async (chunk, token) =>
             {
                 this.Logger?.LogInformation("Uploading chunk {ChunkNumber}/{TotalChunks} for file '{FileName}'...", chunk.ChunkNumber + 1, file.Chunks.Count, file.Name);
-                await UploadChunkAsync(uploadUrl, sessionToken, chunk, file.Chunks.Count, file.Name, token);
+                await UploadChunkAsync(uploadUrl, sessionToken, chunk, file, token);
             });
 
             this.Logger?.LogInformation("All chunks uploaded successfully for file '{FileName}'.", file.Name);
@@ -114,19 +115,25 @@ namespace kDriveClient.kDriveClient
         /// <param name="fileName">File name to log in case of error</param>
         /// <param name="ct">Cancellation token to cancel the operation.</param>
         /// <returns>A task that represents the asynchronous operation.</returns>
-        private async Task UploadChunkAsync(string uploadUrl, string sessionToken, KDriveChunk chunk, long totalChunk, string fileName, CancellationToken ct)
+        private async Task UploadChunkAsync(string uploadUrl, string sessionToken, KDriveChunk chunk, KDriveFile file, CancellationToken ct)
         {
             this.Logger?.LogInformation("Uploading chunk {ChunkNumber}/{TotalChunks} for file '{FileName}' with size {ChunkSize} bytes...", 
-                chunk.ChunkNumber + 1, totalChunk, fileName, chunk.ChunkSize);
+                chunk.ChunkNumber + 1, file.Chunks.Count, file.Name, chunk.ChunkSize);
             var response = await SendAsync(KDriveRequestFactory.CreateChunkUploadRequest(uploadUrl, sessionToken, this.DriveId, chunk), ct);
             try
             {
                 response = await KDriveJsonHelper.DeserializeResponseAsync(response, ct);
             } catch (HttpRequestException ex)
             {
-                this.Logger?.LogError(ex, "Failed to upload chunk {ChunkNumber} for file '{FileName}'", chunk.ChunkNumber + 1, fileName);
+                this.Logger?.LogError(ex, "Failed to upload chunk {ChunkNumber} for file '{FileName}'", chunk.ChunkNumber + 1, file.Name);
                 throw;
             }
+
+            var uploaded = (chunk.ChunkNumber + 1) * chunk.ChunkSize;
+            var percent = Math.Min(100.0, uploaded * 100.0 / file.TotalSize);
+            Progress?.Report(percent);
+            this.Logger?.LogInformation("Chunk {ChunkNumber}/{TotalChunks} for file '{FileName}' uploaded successfully. Uploaded {UploadedSize} bytes ({Percent}%).", 
+                chunk.ChunkNumber + 1, file.Chunks.Count, file.Name, uploaded, percent);    
         }
 
         /// <summary>

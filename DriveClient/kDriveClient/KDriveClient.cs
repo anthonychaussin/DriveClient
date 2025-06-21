@@ -1,6 +1,10 @@
-﻿using kDriveClient.Models;
+﻿using kDriveClient.Helpers;
+using kDriveClient.Models;
+using kDriveClient.Models.Exceptions;
 using Microsoft.Extensions.Logging;
+using System.Net.Http;
 using System.Net.Http.Headers;
+using System.Text.Json;
 using System.Threading.RateLimiting;
 
 namespace kDriveClient.kDriveClient
@@ -22,6 +26,7 @@ namespace kDriveClient.kDriveClient
         });
         private Int64 DirectUploadThresholdBytes { get; set; }
         private Int32 DynamicChunkSizeBytes {get; set; }
+        public IProgress<double>? Progress { get; set; }
 
         /// <summary>
         /// Constructs a new instance of the KDriveClient.
@@ -110,7 +115,14 @@ namespace kDriveClient.kDriveClient
             }
                 
             Logger?.LogInformation("Sending request: {RequestMethod} {RequestUri}", request.Method, request.RequestUri);
-            return await KDriveJsonHelper.DeserializeResponseAsync(await HttpClient.SendAsync(request, ct), ct);
+            return await SendWithErrorHandlingAsync(request, ct);
+        }
+
+        private async Task<HttpResponseMessage> SendWithErrorHandlingAsync(HttpRequestMessage request, CancellationToken ct = default)
+        {
+            var response = await HttpClient.SendAsync(request, ct);
+
+            return await KDriveJsonHelper.DeserializeResponseAsync(response, ct);
         }
     }
 }

@@ -1,4 +1,5 @@
-﻿using Microsoft.Extensions.Logging;
+﻿using kDriveClient.Helpers;
+using Microsoft.Extensions.Logging;
 using System.Net.Http.Headers;
 using System.Security.Cryptography;
 
