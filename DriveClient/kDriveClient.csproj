@@ -17,7 +17,7 @@ Download with redirect support
 Built-in rate limiting (60 requests/min)
 Strong error handling (deserialized API errors)
 Native .NET logging support</Description>
-    <Copyright>AnthonyChaussin2025</Copyright>
+    <Copyright>Copyright (c) 2025 Anthony Chaussin</Copyright>
     <PackageProjectUrl>https://github.com/anthonychaussin/DriveClient</PackageProjectUrl>
     <PackageIcon>kDriveClientIcon.png</PackageIcon>
     <PackageReadmeFile>README.md</PackageReadmeFile>
