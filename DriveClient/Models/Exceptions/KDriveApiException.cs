@@ -1,8 +1,9 @@
 ﻿namespace kDriveClient.Models.Exceptions
 {
-    /// KDriveApiException constructor initializes a new instance of the KDriveApiException class with the specified error details.
-    /// </remarks>
-    /// <param name="error"></param>
+    /// <summary>
+    /// KDriveApiException is thrown when the kDrive API returns an error response.
+    /// </summary>
+    /// <param name="error">The error response from the kDrive API.</param>
     public class KDriveApiException(KDriveErrorResponse error) : Exception($"{error.Error.Code}: {error.Error.Description}")
     {
         /// <summary>

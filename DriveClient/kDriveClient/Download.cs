@@ -1,5 +1,4 @@
 ﻿using kDriveClient.Helpers;
-using Microsoft.Extensions.Logging;
 
 namespace kDriveClient.kDriveClient
 {
@@ -13,7 +12,7 @@ namespace kDriveClient.kDriveClient
         /// </summary>
         /// <param name="fileId">File ID.</param>
         /// <param name="ct">Cancellation token to cancel the operation.</param>
-        /// <returns>Stream containing the file data.</returns>
+        /// <returns>Stream containing the file Data.</returns>
         public async Task<Stream> DownloadFileAsync(long fileId, CancellationToken ct = default)
         {
             this.Logger?.LogInformation("Downloading file with ID {FileId} from kDrive.", fileId);
@@ -21,7 +20,8 @@ namespace kDriveClient.kDriveClient
             try
             {
                 response = await KDriveJsonHelper.DeserializeResponseAsync(response, ct);
-            } catch (Exception ex)
+            }
+            catch (Exception ex)
             {
                 this.Logger?.LogError(ex, "Failed to download file with ID {FileId} from kDrive.", fileId);
                 throw;
@@ -40,7 +40,7 @@ namespace kDriveClient.kDriveClient
         /// Downloads a file from kDrive by its ID and writes it directly to a destination stream.
         /// </summary>
         /// <param name="fileId">File ID.</param>
-        /// <param name="destination">Destination stream to write the file data.</param>
+        /// <param name="destination">Destination stream to write the file Data.</param>
         /// <param name="ct">Cancellation token to cancel the operation.</param>
         /// <returns>Task representing the asynchronous operation.</returns>
         public async Task DownloadFileAsync(long fileId, Stream destination, CancellationToken ct = default)
@@ -51,7 +51,8 @@ namespace kDriveClient.kDriveClient
             try
             {
                 response = await KDriveJsonHelper.DeserializeResponseAsync(response, ct);
-            } catch (Exception ex)
+            }
+            catch (Exception ex)
             {
                 this.Logger?.LogError(ex, "Failed to download file with ID {FileId} from kDrive to destination stream.", fileId);
                 throw;

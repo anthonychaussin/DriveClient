@@ -1,10 +1,6 @@
 ﻿using kDriveClient.Helpers;
 using kDriveClient.Models;
-using kDriveClient.Models.Exceptions;
-using Microsoft.Extensions.Logging;
-using System.Net.Http;
 using System.Net.Http.Headers;
-using System.Text.Json;
 using System.Threading.RateLimiting;
 
 namespace kDriveClient.kDriveClient
@@ -14,18 +10,49 @@ namespace kDriveClient.kDriveClient
     /// </summary>
     public partial class KDriveClient : IKDriveClient
     {
+        /// <summary>
+        /// Logger for logging information, warnings, and errors.
+        /// </summary>
         private ILogger<KDriveClient>? Logger { get; set; }
+
+        /// <summary>
+        /// The ID of the drive to which files will be uploaded or from which files will be downloaded.
+        /// </summary>
         private long DriveId { get; set; }
+
+        /// <summary>
+        /// HttpClient used to send requests to the kDrive API.
+        /// </summary>
         private HttpClient HttpClient { get; set; }
+
+        /// <summary>
+        /// Number of parallel threads to use for chunked uploads.
+        /// </summary>
         private int Parallelism { get; set; } = 4;
+
+        /// <summary>
+        /// Rate limiter to control the rate of requests sent to the kDrive API according to their rate limits
+        /// </summary>
         private RateLimiter RateLimiter { get; set; } = new FixedWindowRateLimiter(new FixedWindowRateLimiterOptions
         {
             PermitLimit = 60,
             Window = TimeSpan.FromMinutes(1),
             AutoReplenishment = true
         });
+
+        /// <summary>
+        /// Direct upload threshold in bytes. Files smaller than this size will be uploaded directly.
+        /// </summary>
         private Int64 DirectUploadThresholdBytes { get; set; }
-        private Int32 DynamicChunkSizeBytes {get; set; }
+
+        /// <summary>
+        /// Dynamic chunk size in bytes. This is determined based on the speed test and is used for chunked uploads.
+        /// </summary>
+        private Int32 DynamicChunkSizeBytes { get; set; }
+
+        /// <summary>
+        /// Progress reporter for tracking upload progress.
+        /// </summary>
         public IProgress<double>? Progress { get; set; }
 
         /// <summary>
@@ -34,7 +61,8 @@ namespace kDriveClient.kDriveClient
         /// <param name="token">Bearer token</param>
         /// <param name="driveId">Drive ID</param>
         public KDriveClient(string token, long driveId) : this(token, driveId, true, 4, null)
-        {}
+        { }
+
         /// <summary>
         /// Constructs a new instance of the KDriveClient with optional logging.
         /// </summary>
@@ -42,7 +70,8 @@ namespace kDriveClient.kDriveClient
         /// <param name="driveId">Drive ID</param>
         /// <param name="logger">Logger</param>
         public KDriveClient(string token, long driveId, ILogger<KDriveClient>? logger) : this(token, driveId, true, 4, logger)
-        {}
+        { }
+
         /// <summary>
         /// Constructs a new instance of the KDriveClient with auto-chunking and parallelism options.
         /// </summary>
@@ -52,7 +81,8 @@ namespace kDriveClient.kDriveClient
         /// <param name="parallelism">Number of parrallels threads</param>
         /// <param name="logger">Logger</param>
         public KDriveClient(string token, long driveId, bool autoChunk, int parallelism, ILogger<KDriveClient>? logger) : this(token, driveId, autoChunk, parallelism, logger, null)
-        {}
+        { }
+
         /// <summary>
         /// Constructs a new instance of the KDriveClient with auto-chunking, parallelism, and custom HttpClient.
         /// </summary>
@@ -113,11 +143,17 @@ namespace kDriveClient.kDriveClient
                 Logger?.LogWarning("Rate limit exceeded for request: {RequestMethod} {RequestUri}", request.Method, request.RequestUri);
                 throw new HttpRequestException("Rate limit exceeded");
             }
-                
+
             Logger?.LogInformation("Sending request: {RequestMethod} {RequestUri}", request.Method, request.RequestUri);
             return await SendWithErrorHandlingAsync(request, ct);
         }
 
+        /// <summary>
+        /// Sends an HTTP request and handles errors by deserializing the response.
+        /// </summary>
+        /// <param name="request"><see cref="HttpRequestMessage"/> request</param>
+        /// <param name="ct">Cancellation token to cancel the operation.</param>
+        /// <returns><see cref="HttpResponseMessage"/></returns>
         private async Task<HttpResponseMessage> SendWithErrorHandlingAsync(HttpRequestMessage request, CancellationToken ct = default)
         {
             var response = await HttpClient.SendAsync(request, ct);

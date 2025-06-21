@@ -1,14 +1,18 @@
-﻿using System.Text.Json;
-using System.Text.Json.Serialization;
-
-namespace kDriveClient.Models
+﻿namespace kDriveClient.Models
 {
-    public class KDriveResponse
+    /// <summary>
+    /// KDriveResponse represents the response structure from the kDrive API.
+    /// </summary>
+    public class KDriveResponse : ApiResultBase
     {
-        public string result { get; set; }
-        public Dictionary<string, object> data { get;set; }
+        /// <summary>
+        /// Result of the API call, typically "success" or "error".
+        /// </summary>
+        public string Result { get; set; } = string.Empty;
 
-        [JsonExtensionData]
-        public Dictionary<string, JsonElement>? ExtraData { get; set; }
+        /// <summary>
+        /// Data contains the actual response data, which can vary based on the API endpoint.
+        /// </summary>
+        public Dictionary<string, object> Data { get; set; } = [];
     }
 }

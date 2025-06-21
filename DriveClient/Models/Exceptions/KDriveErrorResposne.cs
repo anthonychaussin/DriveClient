@@ -1,12 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Text.Json;
-using System.Text.Json.Serialization;
-using System.Threading.Tasks;
-
-namespace kDriveClient.Models.Exceptions
+﻿namespace kDriveClient.Models.Exceptions
 {
     /// <summary>
     /// KDriveErrorResponse represents the error response from the kDrive API.
@@ -17,6 +9,7 @@ namespace kDriveClient.Models.Exceptions
         /// Result indicates the type of error.
         /// </summary>
         public string Result { get; set; } = string.Empty;
+
         /// <summary>
         /// KDriveErrorDetail contains detailed information about the error.
         /// </summary>

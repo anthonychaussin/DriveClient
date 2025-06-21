@@ -1,6 +1,5 @@
 ﻿using kDriveClient.Models;
 using kDriveClient.Models.Exceptions;
-using System.Text.Json;
 
 namespace kDriveClient.Helpers
 {
@@ -10,14 +9,6 @@ namespace kDriveClient.Helpers
     public static class KDriveJsonHelper
     {
         /// <summary>
-        /// JSON serializer options used for deserialization.
-        /// </summary>
-        private static readonly JsonSerializerOptions _defaultOptions = new()
-        {
-            PropertyNameCaseInsensitive = true
-        };
-
-        /// <summary>
         /// Deserializes a JSON string into a KDriveResponse object.
         /// </summary>
         /// <param name="json">JSON string to deserialize</param>
@@ -25,7 +16,7 @@ namespace kDriveClient.Helpers
         /// <exception cref="InvalidOperationException"></exception>
         public static KDriveUploadResponse DeserializeUploadResponse(string json)
         {
-            return JsonSerializer.Deserialize<KDriveUploadResponseWraper>(json, _defaultOptions)?.Data ?? throw new InvalidOperationException("Failed to parse upload response");
+            return JsonSerializer.Deserialize(json, KDriveJsonContext.Default.KDriveUploadResponseWraper)?.Data ?? throw new InvalidOperationException("Failed to parse upload response");
         }
 
         /// <summary>
@@ -36,13 +27,13 @@ namespace kDriveClient.Helpers
         /// <exception cref="InvalidOperationException"></exception>
         public static (string Token, string UploadUrl) ParseStartSessionResponse(string json)
         {
-            var root = JsonSerializer.Deserialize<KDriveResponse>(json, _defaultOptions);
-            if (root == null || root.data == null)
+            var root = JsonSerializer.Deserialize(json, KDriveJsonContext.Default.KDriveResponse);
+            if (root == null || root.Data == null)
             {
-                throw new InvalidOperationException("Start session response is null or missing data");
+                throw new InvalidOperationException("Start session response is null or missing Data");
             }
 
-            if (!root.data.TryGetValue("token", out object? tokenProp) || !root.data.TryGetValue("upload_url", out object? urlProp))
+            if (!root.Data.TryGetValue("token", out object? tokenProp) || !root.Data.TryGetValue("upload_url", out object? urlProp))
             {
                 throw new InvalidOperationException("Start session response is missing required properties");
             }
@@ -52,6 +43,13 @@ namespace kDriveClient.Helpers
                 urlProp?.ToString() ?? throw new InvalidOperationException("UploadUrl is null"));
         }
 
+        /// <summary>
+        /// Deserializes the response from the kDrive API and throws an exception if the response indicates an error.
+        /// </summary>
+        /// <param name="response">The HTTP response message to deserialize.</param>
+        /// <param name="ct">Cancellation token to cancel the operation.</param>
+        /// <returns>A task that represents the asynchronous operation. The task result contains the deserialized HTTP response message.</returns>
+        /// <exception cref="KDriveApiException">Thrown when the response indicates an error.</exception>
         public static async Task<HttpResponseMessage> DeserializeResponseAsync(HttpResponseMessage response, CancellationToken ct)
         {
             if (!response.IsSuccessStatusCode)
@@ -61,7 +59,7 @@ namespace kDriveClient.Helpers
                 KDriveErrorResponse? error = null;
                 try
                 {
-                    error = JsonSerializer.Deserialize<KDriveErrorResponse>(json, _defaultOptions);
+                    error = JsonSerializer.Deserialize(json, KDriveJsonContext.Default.KDriveErrorResponse);
                 }
                 catch
                 {

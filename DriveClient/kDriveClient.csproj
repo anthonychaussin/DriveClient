@@ -4,12 +4,92 @@
     <TargetFramework>net9.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
+    <ApplicationIcon>kDriveClientIcon.ico</ApplicationIcon>
+    <GenerateDocumentationFile>True</GenerateDocumentationFile>
+    <GeneratePackageOnBuild>True</GeneratePackageOnBuild>
+    <Title>$(AssemblyName)</Title>
+    <Authors>Anthony Chaussin</Authors>
+    <Description>kDriveClient is a modern C# SDK to simplify file upload and download with Infomaniak kDrive API, including:
+
+Automatic direct or chunked upload
+Dynamic chunk size based on your actual bandwidth
+Download with redirect support
+Built-in rate limiting (60 requests/min)
+Strong error handling (deserialized API errors)
+Native .NET logging support</Description>
+    <Copyright>AnthonyChaussin2025</Copyright>
+    <PackageProjectUrl>https://github.com/anthonychaussin/DriveClient</PackageProjectUrl>
+    <PackageIcon>kDriveClientIcon.png</PackageIcon>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <RepositoryUrl>https://github.com/anthonychaussin/DriveClient</RepositoryUrl>
+    <PackageTags>infomaniak;kDrive;wrapper;c#;DotNet</PackageTags>
+    <PackageReleaseNotes>✨ New features
+Automatic direct / chunked upload based on real speed test
+
+Dynamic chunk size with ~1s worth of data per chunk (with margin)
+
+Download with redirect support
+
+Built-in 60 req/min rate limiting
+
+Deserialized API error responses (KDriveApiException)
+
+Native logger support (ILogger&lt;KDriveClient&gt;)
+
+Injection support for HttpClient (easier unit/integration testing)
+
+🔧 Improvements
+Clean modular structure: easy to extend or port
+
+Full .NET 7/8/9 compatibility</PackageReleaseNotes>
+    <NeutralLanguage>en</NeutralLanguage>
+    <PackageLicenseFile>LICENSE.txt</PackageLicenseFile>
+    <IncludeSymbols>True</IncludeSymbols>
+    <EnforceCodeStyleInBuild>True</EnforceCodeStyleInBuild>
+    <TrimmerDefaultAction>link</TrimmerDefaultAction>
   </PropertyGroup>
+
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
+    <IsAotCompatible>True</IsAotCompatible>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|AnyCPU'">
+    <IsAotCompatible>True</IsAotCompatible>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Content Include="kDriveClientIcon.ico" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="..\LICENSE.txt">
+      <Pack>True</Pack>
+      <PackagePath>\</PackagePath>
+    </None>
+    <None Include="..\README.md">
+      <Pack>True</Pack>
+      <PackagePath>\</PackagePath>
+    </None>
+  </ItemGroup>
 
   <ItemGroup>
     <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="9.0.6" />
     <PackageReference Include="Microsoft.Extensions.Logging.Console" Version="9.0.6" />
     <PackageReference Include="System.Threading.RateLimiting" Version="9.0.6" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Using Include="Microsoft.Extensions.Logging" />
+    <Using Include="System.Security.Cryptography" />
+    <Using Include="System.Text.Json" />
+    <Using Include="System.Text.Json.Serialization" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Update="kDriveClientIcon.png">
+      <Pack>True</Pack>
+      <PackagePath>\</PackagePath>
+    </None>
   </ItemGroup>
 
 </Project>

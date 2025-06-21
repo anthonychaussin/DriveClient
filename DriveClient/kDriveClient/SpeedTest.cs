@@ -1,7 +1,5 @@
 ﻿using kDriveClient.Helpers;
-using Microsoft.Extensions.Logging;
 using System.Net.Http.Headers;
-using System.Security.Cryptography;
 
 namespace kDriveClient.kDriveClient
 {
@@ -20,7 +18,7 @@ namespace kDriveClient.kDriveClient
             this.Logger?.LogInformation("Starting upload strategy initialization...");
             var buffer = new byte[1024 * 1024];
             RandomNumberGenerator.Fill(buffer);
-            this.Logger?.LogInformation("Generated test data of size {Size} bytes.", buffer.Length);
+            this.Logger?.LogInformation("Generated test Data of size {Size} bytes.", buffer.Length);
             var testFile = new Models.KDriveFile
             {
                 Name = "speedtest.dat",
@@ -52,7 +50,8 @@ namespace kDriveClient.kDriveClient
             try
             {
                 response.EnsureSuccessStatusCode();
-            } catch (HttpRequestException ex)
+            }
+            catch (HttpRequestException ex)
             {
                 this.Logger?.LogError(ex, "Failed to upload chunk: {Message}", ex.Message);
                 throw;
@@ -67,7 +66,7 @@ namespace kDriveClient.kDriveClient
 
             DirectUploadThresholdBytes = (long)speedBytesPerSec;
             DynamicChunkSizeBytes = (int)(speedBytesPerSec * 0.9);
-            this.Logger?.LogInformation("Upload strategy initialized: DirectUploadThresholdBytes = {DirectUploadThresholdBytes}, DynamicChunkSizeBytes = {DynamicChunkSizeBytes}", 
+            this.Logger?.LogInformation("Upload strategy initialized: DirectUploadThresholdBytes = {DirectUploadThresholdBytes}, DynamicChunkSizeBytes = {DynamicChunkSizeBytes}",
                 DirectUploadThresholdBytes, DynamicChunkSizeBytes);
         }
     }

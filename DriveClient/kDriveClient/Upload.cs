@@ -1,6 +1,5 @@
 ﻿using kDriveClient.Helpers;
 using kDriveClient.Models;
-using Microsoft.Extensions.Logging;
 
 namespace kDriveClient.kDriveClient
 {
@@ -22,16 +21,18 @@ namespace kDriveClient.kDriveClient
             {
                 this.Logger?.LogError("File content is null or empty");
                 throw new ArgumentException("File content is required", nameof(file));
-            } else if (string.IsNullOrWhiteSpace(file.Name))
+            }
+            else if (string.IsNullOrWhiteSpace(file.Name))
             {
                 this.Logger?.LogError("File name is null or empty");
                 throw new ArgumentException("File name is required", nameof(file));
-            } else if (file.TotalSize <= 0)
+            }
+            else if (file.TotalSize <= 0)
             {
                 this.Logger?.LogError("File size is less than or equal to 0");
                 throw new ArgumentException("File size must be greater than 0", nameof(file));
             }
-                
+
             this.Logger?.LogInformation("Starting direct upload for file '{FileName}' with size {FileSize} bytes...", file.Name, file.TotalSize);
             var response = await SendAsync(KDriveRequestFactory.CreateUploadDirectRequest(DriveId, file), ct);
 
@@ -95,7 +96,8 @@ namespace kDriveClient.kDriveClient
             try
             {
                 response = await KDriveJsonHelper.DeserializeResponseAsync(response, ct);
-            } catch (HttpRequestException ex)
+            }
+            catch (HttpRequestException ex)
             {
                 this.Logger?.LogError(ex, "Failed to start upload session for file '{FileName}'", file.Name);
                 throw;
@@ -111,19 +113,19 @@ namespace kDriveClient.kDriveClient
         /// <param name="uploadUrl">Base url to upload files</param>
         /// <param name="sessionToken">Session token</param>
         /// <param name="chunk"><see cref="KDriveChunk"/></param>
-        /// <param name="totalChunk">Total number of chunks to upload</param>
-        /// <param name="fileName">File name to log in case of error</param>
+        /// <param name="file"><see cref="KDriveFile"/></param>
         /// <param name="ct">Cancellation token to cancel the operation.</param>
         /// <returns>A task that represents the asynchronous operation.</returns>
         private async Task UploadChunkAsync(string uploadUrl, string sessionToken, KDriveChunk chunk, KDriveFile file, CancellationToken ct)
         {
-            this.Logger?.LogInformation("Uploading chunk {ChunkNumber}/{TotalChunks} for file '{FileName}' with size {ChunkSize} bytes...", 
+            this.Logger?.LogInformation("Uploading chunk {ChunkNumber}/{TotalChunks} for file '{FileName}' with size {ChunkSize} bytes...",
                 chunk.ChunkNumber + 1, file.Chunks.Count, file.Name, chunk.ChunkSize);
             var response = await SendAsync(KDriveRequestFactory.CreateChunkUploadRequest(uploadUrl, sessionToken, this.DriveId, chunk), ct);
             try
             {
                 response = await KDriveJsonHelper.DeserializeResponseAsync(response, ct);
-            } catch (HttpRequestException ex)
+            }
+            catch (HttpRequestException ex)
             {
                 this.Logger?.LogError(ex, "Failed to upload chunk {ChunkNumber} for file '{FileName}'", chunk.ChunkNumber + 1, file.Name);
                 throw;
@@ -132,8 +134,8 @@ namespace kDriveClient.kDriveClient
             var uploaded = (chunk.ChunkNumber + 1) * chunk.ChunkSize;
             var percent = Math.Min(100.0, uploaded * 100.0 / file.TotalSize);
             Progress?.Report(percent);
-            this.Logger?.LogInformation("Chunk {ChunkNumber}/{TotalChunks} for file '{FileName}' uploaded successfully. Uploaded {UploadedSize} bytes ({Percent}%).", 
-                chunk.ChunkNumber + 1, file.Chunks.Count, file.Name, uploaded, percent);    
+            this.Logger?.LogInformation("Chunk {ChunkNumber}/{TotalChunks} for file '{FileName}' uploaded successfully. Uploaded {UploadedSize} bytes ({Percent}%).",
+                chunk.ChunkNumber + 1, file.Chunks.Count, file.Name, uploaded, percent);
         }
 
         /// <summary>
@@ -150,11 +152,12 @@ namespace kDriveClient.kDriveClient
             try
             {
                 response = await KDriveJsonHelper.DeserializeResponseAsync(response, ct);
-            } catch (HttpRequestException ex)
+            }
+            catch (HttpRequestException ex)
             {
                 this.Logger?.LogError(ex, "Failed to finish upload session with token '{SessionToken}'", sessionToken);
                 throw;
-            }   
+            }
 
             this.Logger?.LogInformation("Upload session with token '{SessionToken}' finished successfully.", sessionToken);
             return KDriveJsonHelper.DeserializeUploadResponse(await response.Content.ReadAsStringAsync(ct));
@@ -173,7 +176,8 @@ namespace kDriveClient.kDriveClient
             try
             {
                 response = await KDriveJsonHelper.DeserializeResponseAsync(response, ct);
-            } catch (HttpRequestException ex)
+            }
+            catch (HttpRequestException ex)
             {
                 this.Logger?.LogError(ex, "Failed to cancel upload session with token '{SessionToken}'", sessionToken);
                 throw;
