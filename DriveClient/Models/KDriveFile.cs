@@ -63,6 +63,11 @@
         public required Stream Content { get; init; }
 
         /// <summary>
+        /// In case of conflict with an existing file, it define how to manage the conflict
+        /// </summary>
+        public ConflictChoice ConflictChoice { get; set; } = ConflictChoice.Version;
+
+        /// <summary>
         /// Splits the file content into chunks of the specified size.
         /// </summary>
         /// <param name="chunkSize">Define the size of each chunk (except the last one)</param>
@@ -90,6 +95,21 @@
         public string GetEscapedFileName()
         {
             return Uri.EscapeDataString(Name.Replace("/", ":"));
+        }
+
+        /// <summary>
+        /// Convert enum to string for api
+        /// </summary>
+        /// <returns>String representation of </returns>
+        public string ConvertConflictChoice()
+        {
+            return this.ConflictChoice switch
+            {
+                ConflictChoice.Version => "version",
+                ConflictChoice.Error => "error",
+                ConflictChoice.Rename => "rename",
+                _ => "error"
+            };
         }
     }
 }

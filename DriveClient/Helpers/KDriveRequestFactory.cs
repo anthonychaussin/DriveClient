@@ -120,7 +120,7 @@ namespace kDriveClient.Helpers
             {
                 { "file_name", file.GetEscapedFileName() },
                 { "total_size", file.TotalSize },
-                {"conflict", "rename" }
+                { "conflict", file.ConvertConflictChoice() }
             };
 
             AddDirectoryParam(file, list);

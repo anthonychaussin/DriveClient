@@ -18,7 +18,7 @@ namespace kDriveClient.kDriveClient
         /// <summary>
         /// The ID of the drive to which files will be uploaded or from which files will be downloaded.
         /// </summary>
-        private long DriveId { get; set; }
+        private Int64 DriveId { get; set; }
 
         /// <summary>
         /// HttpClient used to send requests to the kDrive API.
@@ -28,7 +28,7 @@ namespace kDriveClient.kDriveClient
         /// <summary>
         /// Number of parallel threads to use for chunked uploads.
         /// </summary>
-        private int Parallelism { get; set; } = 4;
+        private Int32 Parallelism { get; set; } = 4;
 
         /// <summary>
         /// Rate limiter to control the rate of requests sent to the kDrive API according to their rate limits
