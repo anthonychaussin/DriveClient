@@ -1,6 +1,7 @@
 ﻿using kDriveClient.Helpers;
 using kDriveClient.Models;
 using System.Net.Http.Headers;
+using System.Reflection;
 using System.Threading.RateLimiting;
 
 namespace kDriveClient.kDriveClient
@@ -100,7 +101,7 @@ namespace kDriveClient.kDriveClient
             string version = Assembly.GetEntryAssembly()?.GetName().Version?.ToString() ?? "unknown";
             HttpClient = httpClient ?? new HttpClient { BaseAddress = new Uri("https://api.infomaniak.com") };
             HttpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
-            HttpClient.DefaultRequestHeaders.UserAgent(new ProductInfoHeaderValue("kDriveClient.NET", version));
+            HttpClient.DefaultRequestHeaders.UserAgent.ParseAdd("kDriveClient.NET/version");
             this.Logger?.LogInformation("KDriveClient initialized with Drive ID: {DriveId}", DriveId);
             if (autoChunk)
             {
