@@ -24,29 +24,13 @@ Native .NET logging support</Description>
     <RepositoryUrl>https://github.com/anthonychaussin/DriveClient</RepositoryUrl>
     <PackageTags>infomaniak;kDrive;wrapper;c#;DotNet</PackageTags>
     <PackageReleaseNotes>✨ New features
-Automatic direct / chunked upload based on real speed test
-
-Dynamic chunk size with ~1s worth of data per chunk (with margin)
-
-Download with redirect support
-
-Built-in 60 req/min rate limiting
-
-Deserialized API error responses (KDriveApiException)
-
-Native logger support (ILogger&lt;KDriveClient&gt;)
-
-Injection support for HttpClient (easier unit/integration testing)
-
-🔧 Improvements
-Clean modular structure: easy to extend or port
-
-Full .NET 7/8/9 compatibility</PackageReleaseNotes>
+- Added support for per-file `conflict_mode` (`error`, `rename`, `version`) via `KDriveFile.ConflictMode`</PackageReleaseNotes>
     <NeutralLanguage>en</NeutralLanguage>
     <PackageLicenseFile>LICENSE.txt</PackageLicenseFile>
     <IncludeSymbols>True</IncludeSymbols>
     <EnforceCodeStyleInBuild>True</EnforceCodeStyleInBuild>
     <TrimmerDefaultAction>link</TrimmerDefaultAction>
+    <Version>1.0.2</Version>
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
