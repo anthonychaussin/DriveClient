@@ -81,7 +81,7 @@ namespace kDriveClient.kDriveClient
         /// <param name="autoChunk">Choose if we should make a speed test to optimize chunks</param>
         /// <param name="parallelism">Number of parrallels threads</param>
         /// <param name="logger">Logger</param>
-        public KDriveClient(string token, long driveId, bool autoChunk, int parallelism, ILogger<KDriveClient>? logger) : this(token, driveId, autoChunk, parallelism, logger, null)
+        public KDriveClient(string token, long driveId, bool autoChunk, int parallelism, ILogger<KDriveClient>? logger) : this(token, driveId, autoChunk, parallelism, logger, null, null)
         { }
 
         /// <summary>
@@ -93,7 +93,8 @@ namespace kDriveClient.kDriveClient
         /// <param name="parallelism">Number of parrallels threads</param>
         /// <param name="logger">Logger</param>
         /// <param name="httpClient">Custome HttpClient</param>
-        public KDriveClient(string token, long driveId, bool autoChunk, int parallelism, ILogger<KDriveClient>? logger, HttpClient? httpClient = null)
+        /// <param name="chunkSize">Optional custom chunk size in bytes. If not specified, will be calculated dynamically based on speed test when autoChunk is true.</param>
+        public KDriveClient(string token, long driveId, bool autoChunk, int parallelism, ILogger<KDriveClient>? logger, HttpClient? httpClient = null, int? chunkSize = null)
         {
             DriveId = driveId;
             Parallelism = parallelism;
@@ -103,11 +104,24 @@ namespace kDriveClient.kDriveClient
             HttpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
             HttpClient.DefaultRequestHeaders.UserAgent.ParseAdd("kDriveClient.NET/version");
             this.Logger?.LogInformation("KDriveClient initialized with Drive ID: {DriveId}", DriveId);
+
+            if (chunkSize.HasValue)
+            {
+                DynamicChunkSizeBytes = chunkSize.Value;
+                this.Logger?.LogInformation("Using custom chunk size: {ChunkSize} bytes", DynamicChunkSizeBytes);
+            }
+
             if (autoChunk)
             {
                 this.Logger?.LogInformation("Auto chunking enabled, initializing upload strategy...");
-                InitializeUploadStrategyAsync().GetAwaiter().GetResult();
+                InitializeUploadStrategyAsync(chunkSize).GetAwaiter().GetResult();
                 this.Logger?.LogInformation("Upload strategy initialized with direct upload threshold: {Threshold} bytes and dynamic chunk size: {ChunkSize} bytes", DirectUploadThresholdBytes, DynamicChunkSizeBytes);
+            }
+            else if (!chunkSize.HasValue)
+            {
+                // If autoChunk is disabled and no custom chunk size provided, use a default
+                DynamicChunkSizeBytes = 1024 * 1024; // Default to 1MB chunks
+                this.Logger?.LogInformation("Using default chunk size: {ChunkSize} bytes", DynamicChunkSizeBytes);
             }
         }
 

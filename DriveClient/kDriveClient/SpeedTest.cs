@@ -11,9 +11,10 @@ namespace kDriveClient.kDriveClient
         /// <summary>
         /// Initializes the upload strategy by performing a speed test.
         /// </summary>
+        /// <param name="customChunkSize">Optional custom chunk size in bytes. If specified, only DirectUploadThresholdBytes will be calculated from speed test.</param>
         /// <param name="ct">Cancellation token to cancel the operation.</param>
         /// <returns>A task that represents the asynchronous operation.</returns>
-        private async Task InitializeUploadStrategyAsync(CancellationToken ct = default)
+        private async Task InitializeUploadStrategyAsync(int? customChunkSize = null, CancellationToken ct = default)
         {
             this.Logger?.LogInformation("Starting upload strategy initialization...");
             var buffer = new byte[1024 * 1024];
@@ -65,9 +66,18 @@ namespace kDriveClient.kDriveClient
             var speedBytesPerSec = buffer.Length / (sw.ElapsedMilliseconds / 1000.0);
 
             DirectUploadThresholdBytes = (long)speedBytesPerSec;
-            DynamicChunkSizeBytes = (int)(speedBytesPerSec * 0.9);
-            this.Logger?.LogInformation("Upload strategy initialized: DirectUploadThresholdBytes = {DirectUploadThresholdBytes}, DynamicChunkSizeBytes = {DynamicChunkSizeBytes}",
-                DirectUploadThresholdBytes, DynamicChunkSizeBytes);
+
+            if (!customChunkSize.HasValue)
+            {
+                DynamicChunkSizeBytes = (int)(speedBytesPerSec * 0.9);
+                this.Logger?.LogInformation("Upload strategy initialized: DirectUploadThresholdBytes = {DirectUploadThresholdBytes}, DynamicChunkSizeBytes = {DynamicChunkSizeBytes} (calculated from speed test)",
+                    DirectUploadThresholdBytes, DynamicChunkSizeBytes);
+            }
+            else
+            {
+                this.Logger?.LogInformation("Upload strategy initialized: DirectUploadThresholdBytes = {DirectUploadThresholdBytes}, DynamicChunkSizeBytes = {DynamicChunkSizeBytes} (custom)",
+                    DirectUploadThresholdBytes, DynamicChunkSizeBytes);
+            }
         }
     }
 }
