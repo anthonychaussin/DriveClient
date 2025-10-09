@@ -11,6 +11,7 @@ namespace kDriveClient.Helpers
     [JsonSerializable(typeof(KDriveFile))]
     [JsonSerializable(typeof(KDriveChunk))]
     [JsonSerializable(typeof(KDriveUploadResponseWraper))]
+    [JsonSerializable(typeof(KDriveFinishRequest))]
     [JsonSourceGenerationOptions(PropertyNameCaseInsensitive = true)]
     public partial class KDriveJsonContext : JsonSerializerContext
     {

@@ -74,10 +74,12 @@ namespace kDriveClient.Helpers
         /// <returns>An HttpRequestMessage configured to finish the upload session.</returns>
         public static HttpRequestMessage CreateFinishSessionRequest(long driveId, string sessionToken, string totalChunkHash)
         {
-            var content = new StringContent(JsonSerializer.Serialize(new
+            var finishRequest = new KDriveFinishRequest
             {
-                total_chunk_hash = $"sha256:{totalChunkHash.ToLowerInvariant()}"
-            }, KDriveJsonContext.Default.Object));
+                TotalChunkHash = $"sha256:{totalChunkHash.ToLowerInvariant()}"
+            };
+
+            var content = new StringContent(JsonSerializer.Serialize(finishRequest, KDriveJsonContext.Default.KDriveFinishRequest));
 
             content.Headers.ContentType = new MediaTypeHeaderValue("application/json");
 
