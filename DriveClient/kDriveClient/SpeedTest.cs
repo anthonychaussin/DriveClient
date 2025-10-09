@@ -16,6 +16,16 @@ namespace kDriveClient.kDriveClient
         /// <returns>A task that represents the asynchronous operation.</returns>
         private async Task InitializeUploadStrategyAsync(int? customChunkSize = null, CancellationToken ct = default)
         {
+            if (customChunkSize != null)
+            {
+                DynamicChunkSizeBytes = (int)customChunkSize;
+                DirectUploadThresholdBytes = (int)customChunkSize;
+                this.Logger?.LogInformation("Custom chunk size is provided. Speed test is no longer needed");
+                this.Logger?.LogInformation("Upload strategy initialized: DirectUploadThresholdBytes = {DirectUploadThresholdBytes}, DynamicChunkSizeBytes = {DynamicChunkSizeBytes} (custom)",
+                    DirectUploadThresholdBytes, DynamicChunkSizeBytes);
+                return;
+            }
+
             this.Logger?.LogInformation("Starting upload strategy initialization...");
             var buffer = new byte[1024 * 1024];
             RandomNumberGenerator.Fill(buffer);
@@ -67,17 +77,9 @@ namespace kDriveClient.kDriveClient
 
             DirectUploadThresholdBytes = (long)speedBytesPerSec;
 
-            if (!customChunkSize.HasValue)
-            {
-                DynamicChunkSizeBytes = (int)(speedBytesPerSec * 0.9);
-                this.Logger?.LogInformation("Upload strategy initialized: DirectUploadThresholdBytes = {DirectUploadThresholdBytes}, DynamicChunkSizeBytes = {DynamicChunkSizeBytes} (calculated from speed test)",
-                    DirectUploadThresholdBytes, DynamicChunkSizeBytes);
-            }
-            else
-            {
-                this.Logger?.LogInformation("Upload strategy initialized: DirectUploadThresholdBytes = {DirectUploadThresholdBytes}, DynamicChunkSizeBytes = {DynamicChunkSizeBytes} (custom)",
-                    DirectUploadThresholdBytes, DynamicChunkSizeBytes);
-            }
+            DynamicChunkSizeBytes = (int)(speedBytesPerSec * 0.9);
+            this.Logger?.LogInformation("Upload strategy initialized: DirectUploadThresholdBytes = {DirectUploadThresholdBytes}, DynamicChunkSizeBytes = {DynamicChunkSizeBytes} (calculated from speed test)",
+                DirectUploadThresholdBytes, DynamicChunkSizeBytes);
         }
     }
 }

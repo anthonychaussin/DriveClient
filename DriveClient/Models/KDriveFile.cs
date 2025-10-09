@@ -7,6 +7,7 @@ namespace kDriveClient.Models
     /// </summary>
     public class KDriveFile
     {
+        private string _totalChunkHash;
         /// <summary>
         /// CreatedAt is the timestamp when the file was created.
         /// </summary>
@@ -40,7 +41,19 @@ namespace kDriveClient.Models
         /// <summary>
         /// TotalChunkHash is the SHA-256 hash of the entire file content, computed from all chunks.
         /// </summary>
-        public string TotalChunkHash { get; private set; } = string.Empty;
+        public string TotalChunkHash
+        {
+            get
+            {
+                if(this._totalChunkHash is null)
+                {
+                    this._totalChunkHash = Convert.ToHexString(
+                        SHA256.HashData(this.Content));
+                }
+
+                return this._totalChunkHash;
+            }
+        }
 
         /// <summary>
         /// TotalSize is the total size of the file in bytes, calculated as the sum of all chunk sizes.
@@ -74,23 +87,11 @@ namespace kDriveClient.Models
 
             this.Content.Position = 0;
 
-            // Use incremental hash to compute the total file hash as we read chunks
-            using var fileSha256 = System.Security.Cryptography.IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
-
             while ((bytesRead = this.Content.Read(buffer, 0, chunkSize)) > 0)
             {
                 byte[] content = [.. buffer.Take(bytesRead)];
-                var chunkHash = SHA256.HashData(content);
-                this.Chunks.Add(new KDriveChunk(content, chunkNumber++, chunkHash));
-
-                // Add chunk hash hex string (lowercase) to compute total_chunk_hash
-                // According to kDrive API, total_chunk_hash is the hash of concatenated chunk hash hex strings
-                var chunkHashHex = Convert.ToHexString(chunkHash).ToLowerInvariant();
-                fileSha256.AppendData(Encoding.UTF8.GetBytes(chunkHashHex));
+                this.Chunks.Add(new KDriveChunk(content, chunkNumber++, SHA256.HashData(content)));
             }
-
-            // Compute and store the total chunk hash (hash of all chunk hash hex strings concatenated)
-            this.TotalChunkHash = Convert.ToHexString(fileSha256.GetHashAndReset());
 
             this.Content.Position = 0;
         }

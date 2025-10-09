@@ -102,14 +102,8 @@ namespace kDriveClient.kDriveClient
             string version = Assembly.GetEntryAssembly()?.GetName().Version?.ToString() ?? "unknown";
             HttpClient = httpClient ?? new HttpClient { BaseAddress = new Uri("https://api.infomaniak.com") };
             HttpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
-            HttpClient.DefaultRequestHeaders.UserAgent.ParseAdd("kDriveClient.NET/version");
+            HttpClient.DefaultRequestHeaders.UserAgent.ParseAdd("kDriveClient.NET/"+version);
             this.Logger?.LogInformation("KDriveClient initialized with Drive ID: {DriveId}", DriveId);
-
-            if (chunkSize.HasValue)
-            {
-                DynamicChunkSizeBytes = chunkSize.Value;
-                this.Logger?.LogInformation("Using custom chunk size: {ChunkSize} bytes", DynamicChunkSizeBytes);
-            }
 
             if (autoChunk)
             {
@@ -117,11 +111,15 @@ namespace kDriveClient.kDriveClient
                 InitializeUploadStrategyAsync(chunkSize).GetAwaiter().GetResult();
                 this.Logger?.LogInformation("Upload strategy initialized with direct upload threshold: {Threshold} bytes and dynamic chunk size: {ChunkSize} bytes", DirectUploadThresholdBytes, DynamicChunkSizeBytes);
             }
-            else if (!chunkSize.HasValue)
+            else if (chunkSize is null) // If autoChunk is disabled and no custom chunk size provided, use a default
             {
-                // If autoChunk is disabled and no custom chunk size provided, use a default
                 DynamicChunkSizeBytes = 1024 * 1024; // Default to 1MB chunks
                 this.Logger?.LogInformation("Using default chunk size: {ChunkSize} bytes", DynamicChunkSizeBytes);
+            }
+            else 
+            {
+                DynamicChunkSizeBytes = chunkSize.Value;
+                this.Logger?.LogInformation("Using custom chunk size: {ChunkSize} bytes", DynamicChunkSizeBytes);
             }
         }
 
