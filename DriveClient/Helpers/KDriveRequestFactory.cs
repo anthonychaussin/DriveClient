@@ -74,13 +74,8 @@ namespace kDriveClient.Helpers
         /// <returns>An HttpRequestMessage configured to finish the upload session.</returns>
         public static HttpRequestMessage CreateFinishSessionRequest(long driveId, string sessionToken, string totalChunkHash)
         {
-            var finishRequest = new KDriveFinishRequest
-            {
-                TotalChunkHash = $"sha256:{totalChunkHash.ToLowerInvariant()}"
-            };
-
-            var content = new StringContent(JsonSerializer.Serialize(finishRequest, KDriveJsonContext.Default.KDriveFinishRequest));
-
+            // Send empty JSON body - kDrive validates file integrity via individual chunk hashes
+            var content = new StringContent("{}");
             content.Headers.ContentType = new MediaTypeHeaderValue("application/json");
 
             return new HttpRequestMessage(HttpMethod.Post, $"/3/drive/{driveId}/upload/session/{sessionToken}/finish")
