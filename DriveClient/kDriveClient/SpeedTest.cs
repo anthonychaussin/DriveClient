@@ -8,6 +8,10 @@ namespace kDriveClient.kDriveClient
     /// </summary>
     public partial class KDriveClient
     {
+        private const int MaxRequestsPerMinute = 60;
+        private const int MinChunkBytes = 100 * 1024 * 1024;
+        private const long MaxChunkBytes = 1L * 1024 * 1024 * 1024;
+        private const double Safety = 1.10;
         /// <summary>
         /// Initializes the upload strategy by performing a speed test.
         /// </summary>
@@ -73,11 +77,15 @@ namespace kDriveClient.kDriveClient
             await CancelUploadSessionRequest(SessionToken, ct);
             this.Logger?.LogInformation("Upload session finalized successfully.");
 
-            var speedBytesPerSec = buffer.Length / (sw.ElapsedMilliseconds / 1000.0);
+            var v = buffer.Length / Math.Max(0.001, sw.Elapsed.TotalSeconds);
+            Logger?.LogInformation("Measured upload speed: {SpeedF2} MB/s", v / (1024 * 1024.0));
 
-            DirectUploadThresholdBytes = (long)speedBytesPerSec;
+            var target = Math.Min(Math.Max((long)Math.Ceiling((long)Math.Ceiling(Parallelism * v * 60.0 / MaxRequestsPerMinute) * Safety), MinChunkBytes), MaxChunkBytes);
+            
+            DynamicChunkSizeBytes = (int)target;
 
-            DynamicChunkSizeBytes = (int)(speedBytesPerSec * 0.9);
+            DirectUploadThresholdBytes = (long)(target * 1.5);
+
             this.Logger?.LogInformation("Upload strategy initialized: DirectUploadThresholdBytes = {DirectUploadThresholdBytes}, DynamicChunkSizeBytes = {DynamicChunkSizeBytes} (calculated from speed test)",
                 DirectUploadThresholdBytes, DynamicChunkSizeBytes);
         }

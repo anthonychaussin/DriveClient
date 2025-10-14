@@ -16,7 +16,7 @@ namespace kDriveClient.Helpers
         /// <exception cref="InvalidOperationException"></exception>
         public static KDriveUploadResponse DeserializeUploadResponse(string json)
         {
-            return JsonSerializer.Deserialize(json, KDriveJsonContext.Default.KDriveUploadResponseWraper)?.Data ?? throw new InvalidOperationException("Failed to parse upload response");
+            return JsonSerializer.Deserialize(json, KDriveJsonContext.Default.KDriveUploadResponseWraper)?.Data?.File ?? throw new InvalidOperationException("Failed to parse upload response");
         }
 
         /// <summary>
@@ -54,19 +54,18 @@ namespace kDriveClient.Helpers
         {
             if (!response.IsSuccessStatusCode)
             {
-                var json = await response.Content.ReadAsStringAsync(ct);
-
                 KDriveErrorResponse? error = null;
                 try
                 {
-                    error = JsonSerializer.Deserialize(json, KDriveJsonContext.Default.KDriveErrorResponse);
+                    await using var stream = await response.Content.ReadAsStreamAsync(ct);
+                    error = await JsonSerializer.DeserializeAsync( stream, KDriveJsonContext.Default.KDriveErrorResponse, cancellationToken: ct);
                 }
                 catch
                 {
                     response.EnsureSuccessStatusCode();
                 }
 
-                if (error != null)
+                if (error is not null)
                 {
                     throw new KDriveApiException(error);
                 }

@@ -5,9 +5,10 @@ namespace kDriveClient.Models
     /// <summary>
     /// KDriveFile represents a file in the kDrive system.
     /// </summary>
-    public class KDriveFile
+    public class KDriveFile : IDisposable
     {
-        private string _totalChunkHash;
+        private Int64 totalSize;
+
         /// <summary>
         /// CreatedAt is the timestamp when the file was created.
         /// </summary>
@@ -41,24 +42,22 @@ namespace kDriveClient.Models
         /// <summary>
         /// TotalChunkHash is the SHA-256 hash of the entire file content, computed from all chunks.
         /// </summary>
-        public string TotalChunkHash
-        {
-            get
-            {
-                if(this._totalChunkHash is null)
-                {
-                    this._totalChunkHash = Convert.ToHexString(
-                        SHA256.HashData(this.Content));
-                }
-
-                return this._totalChunkHash;
-            }
-        }
+        public string TotalChunkHash { get; set; }
 
         /// <summary>
         /// TotalSize is the total size of the file in bytes, calculated as the sum of all chunk sizes.
         /// </summary>
-        public long TotalSize => this.Chunks.Sum(c => c.ChunkSize);
+        public long TotalSize
+        {
+            get
+            {
+                if(totalSize == 0)
+                {
+                    totalSize = this.Chunks.Sum(c => (long)c.ChunkSize);
+                }
+                return totalSize;
+            }
+        }
 
         /// <summary>
         /// Chunks is a list of KDriveChunk objects representing the file's content split into chunks.
@@ -86,14 +85,21 @@ namespace kDriveClient.Models
             int bytesRead;
 
             this.Content.Position = 0;
-
+            using var fileSha256 = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
             while ((bytesRead = this.Content.Read(buffer, 0, chunkSize)) > 0)
             {
                 byte[] content = [.. buffer.Take(bytesRead)];
-                this.Chunks.Add(new KDriveChunk(content, chunkNumber++, SHA256.HashData(content)));
+                var chunkHash = SHA256.HashData(content);
+                this.Chunks.Add(new KDriveChunk(content, chunkNumber++, chunkHash));
+                fileSha256.AppendData(Encoding.UTF8.GetBytes(Convert.ToHexString(chunkHash).ToLowerInvariant()));
             }
 
-            this.Content.Position = 0;
+            this.Content.Dispose();
+            GC.Collect();
+
+            this.TotalChunkHash = this.Chunks.Count > 1 ?
+                this.TotalChunkHash = Convert.ToHexString(fileSha256.GetHashAndReset())
+                : this.Chunks.First().ChunkHash;
         }
 
         /// <summary>
@@ -118,6 +124,13 @@ namespace kDriveClient.Models
                 ConflictChoice.Rename => "rename",
                 _ => "error"
             };
+        }
+
+        public void Dispose()
+        {
+            this.Chunks.ForEach(c => c.Dispose());
+            
+            GC.SuppressFinalize(this);
         }
     }
 }

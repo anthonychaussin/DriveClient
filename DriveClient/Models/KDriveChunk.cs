@@ -3,7 +3,7 @@
     /// <summary>
     /// kDriveChunk represents a chunk of Data in a kDrive file.
     /// </summary>
-    public class KDriveChunk(byte[] content, int chunkNumber, byte[] hash)
+    public class KDriveChunk(byte[] content, int chunkNumber, byte[] hash) : IDisposable
     {
         /// <summary>
         /// ChunkHash is the SHA-256 hash of the chunk content.
@@ -18,11 +18,22 @@
         /// <summary>
         /// ChunkSize is the size of the chunk in bytes.
         /// </summary>
-        public long ChunkSize => this.Content.Length;
+        public int ChunkSize { get; set; } = content.Length;
 
         /// <summary>
         /// Content is the actual byte content of the chunk.
         /// </summary>
-        public byte[] Content { get; init; } = content;
+        public byte[]? Content { get; private set; } = content;
+
+        public void Dispose()
+        {
+            GC.SuppressFinalize(this);
+        }
+
+        internal void Clean()
+        {
+            this.Content = null;
+            GC.Collect();
+        }
     }
 }

@@ -24,13 +24,15 @@ Native .NET logging support</Description>
     <RepositoryUrl>https://github.com/anthonychaussin/DriveClient</RepositoryUrl>
     <PackageTags>infomaniak;kDrive;wrapper;c#;DotNet</PackageTags>
     <PackageReleaseNotes>✨ New features
-- Added support for per-file `conflict_mode` (`error`, `rename`, `version`) via `KDriveFile.ConflictMode`</PackageReleaseNotes>
+- Add optional chunkSize parameter to KDriveClient constructor
+- bypass speed test if custom chunk size is provided
+- fix user-agent version</PackageReleaseNotes>
     <NeutralLanguage>en</NeutralLanguage>
     <PackageLicenseFile>LICENSE.txt</PackageLicenseFile>
     <IncludeSymbols>True</IncludeSymbols>
     <EnforceCodeStyleInBuild>True</EnforceCodeStyleInBuild>
     <TrimmerDefaultAction>link</TrimmerDefaultAction>
-    <Version>1.0.2</Version>
+    <Version>1.0.3</Version>
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">

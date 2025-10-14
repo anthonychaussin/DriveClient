@@ -13,7 +13,15 @@
         /// <summary>
         /// Data containing the details of the uploaded file.
         /// </summary>
-        public KDriveUploadResponse? Data { get; set; }
+        public KDriveUploadDataResponse? Data { get; set; }
+    }
+
+    public class KDriveUploadDataResponse : ApiResultBase
+    {
+        public KDriveUploadResponse File { get; set; }
+        public string Token { get; set; }
+        public bool Result { get; set; }
+        public string? Message { get; set; }
     }
 
     /// <summary>
@@ -65,5 +73,20 @@
         /// File hash.
         /// </summary>
         public string? Hash { get; set; }
+        public string Type { get; set; }
+        public string Status { get; set; }
+        public string Visibility { get; set; }
+        public int Drive_id { get; set; }
+        public int Depth { get; set; }
+        public int Created_by { get; set; }
+        public int Created_at { get; set; }
+        public int Added_at { get; set; }
+        public int Last_modified_at { get; set; }
+        public int Last_modified_by { get; set; }
+        public int Revised_at { get; set; }
+        public int Updated_at { get; set; }
+        public int Parent_id { get; set; }
+        public string Extension_type { get; set; }
+        public string Scan_status { get; set; }
     }
 }
