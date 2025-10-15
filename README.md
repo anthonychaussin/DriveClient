@@ -86,14 +86,14 @@ Console.WriteLine($"File downloaded and saved to {fs.Name}");
 ✅ **Custom parallelism**
 
 ```csharp
-var client = new KDriveClient("your_token", "your_drive_id", true, 8);
+var client = new KDriveClient("your_token", "your_drive_id", new KDriveClientOptions { Parallelism = 8});
 ```
 
 ✅ **Inject your own `HttpClient` (for testing/mocking)**
 
 ```csharp
 var fakeHttpClient = new HttpClient(new FakeHandler()) { BaseAddress = new Uri("https://api.infomaniak.com") };
-var client = new KDriveClient("your_token", "your_drive_id", true, 4, null, httpClient: fakeHttpClient);
+var client = new KDriveClient("your_token", "your_drive_id", httpClient: fakeHttpClient);
 ```
 
 ✅ **Built-in error object**
@@ -110,7 +110,7 @@ catch (KDriveApiException ex)
 ### ✅ **Features**
 
 * Automatic direct or chunked upload mode based on speed test
-* Dynamic chunk size calculation (\~1s worth of data with safety margin)
+* Dynamic chunk size calculation
 * Download with redirect support
 * Rate limit of 60 requests/min
 * Deserialized error responses (no manual parsing)

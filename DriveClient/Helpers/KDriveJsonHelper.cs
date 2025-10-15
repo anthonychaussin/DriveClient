@@ -52,24 +52,7 @@ namespace kDriveClient.Helpers
         /// <exception cref="KDriveApiException">Thrown when the response indicates an error.</exception>
         public static async Task<HttpResponseMessage> DeserializeResponseAsync(HttpResponseMessage response, CancellationToken ct)
         {
-            if (!response.IsSuccessStatusCode)
-            {
-                KDriveErrorResponse? error = null;
-                try
-                {
-                    await using var stream = await response.Content.ReadAsStreamAsync(ct);
-                    error = await JsonSerializer.DeserializeAsync(stream, KDriveJsonContext.Default.KDriveErrorResponse, cancellationToken: ct);
-                }
-                catch
-                {
-                    response.EnsureSuccessStatusCode();
-                }
-
-                if (error is not null)
-                {
-                    throw new KDriveApiException(error);
-                }
-            }
+            await KDriveErrorHandler.HandleApiErrorAsync(response, ct);
 
             return response;
         }

@@ -31,7 +31,7 @@ namespace kDriveClient.kDriveClient
         /// <summary>
         /// Number of parallel threads to use for chunked uploads.
         /// </summary>
-        private Int32 Parallelism { get; set; } = 4;
+        public Int32 Parallelism { get; private set; } = 4;
 
         /// <summary>
         /// Rate limiter to control the rate of requests sent to the kDrive API according to their rate limits
@@ -51,7 +51,7 @@ namespace kDriveClient.kDriveClient
         /// <summary>
         /// Dynamic chunk size in bytes. This is determined based on the speed test and is used for chunked uploads.
         /// </summary>
-        private Int32 DynamicChunkSizeBytes { get; set; }
+        public Int32 DynamicChunkSizeBytes { get; private set; }
 
         /// <summary>
         /// Progress reporter for tracking upload progress.
@@ -63,7 +63,7 @@ namespace kDriveClient.kDriveClient
         /// </summary>
         /// <param name="token">Bearer token</param>
         /// <param name="driveId">Drive ID</param>
-        public KDriveClient(string token, long driveId) : this(token, driveId, true, 4, null)
+        public KDriveClient(string token, long driveId) : this(token, driveId, new KDriveClientOptions())
         { }
 
         /// <summary>
@@ -72,7 +72,25 @@ namespace kDriveClient.kDriveClient
         /// <param name="token">Bearer token</param>
         /// <param name="driveId">Drive ID</param>
         /// <param name="logger">Logger</param>
-        public KDriveClient(string token, long driveId, ILogger<KDriveClient>? logger) : this(token, driveId, true, 4, logger)
+        public KDriveClient(string token, long driveId, ILogger<KDriveClient>? logger) : this(token, driveId, new KDriveClientOptions(), logger)
+        { }
+
+        /// <summary>
+        /// Constructs a new instance of the KDriveClient with custom options.
+        /// </summary>
+        /// <param name="token">Bearer token</param>
+        /// <param name="driveId">Drive ID</param>
+        /// <param name="options">Options</param>
+        public KDriveClient(string token, long driveId, KDriveClientOptions options) : this(token, driveId, options, null)
+        { }
+
+        /// <summary>
+        /// Constructs a new instance of the KDriveClient with custom HttpClient.
+        /// </summary>
+        /// <param name="token">Bearer token</param>
+        /// <param name="driveId">Drive ID</param>
+        /// <param name="httpClient">Custom HttpClient</param>
+        public KDriveClient(string token, long driveId, HttpClient? httpClient) : this(token, driveId, new KDriveClientOptions(), null, httpClient)
         { }
 
         /// <summary>
@@ -80,10 +98,9 @@ namespace kDriveClient.kDriveClient
         /// </summary>
         /// <param name="token">Bearer token</param>
         /// <param name="driveId">Drive ID</param>
-        /// <param name="autoChunk">Choose if we should make a speed test to optimize chunks</param>
-        /// <param name="parallelism">Number of parrallels threads</param>
+        /// <param name="options"></param>
         /// <param name="logger">Logger</param>
-        public KDriveClient(string token, long driveId, bool autoChunk, int parallelism, ILogger<KDriveClient>? logger) : this(token, driveId, autoChunk, parallelism, logger, null, null)
+        public KDriveClient(string token, long driveId, KDriveClientOptions options, ILogger<KDriveClient>? logger) : this(token, driveId, options, logger, null)
         { }
 
         /// <summary>
@@ -91,46 +108,44 @@ namespace kDriveClient.kDriveClient
         /// </summary>
         /// <param name="token">Bearer token</param>
         /// <param name="driveId">Drive ID</param>
-        /// <param name="autoChunk">Choose if we should make a speed test to optimize chunks</param>
-        /// <param name="parallelism">Number of parrallels threads</param>
+        /// <param name="options">Options</param>
         /// <param name="logger">Logger</param>
-        /// <param name="httpClient">Custome HttpClient</param>
-        /// <param name="chunkSize">Optional custom chunk size in bytes. If not specified, will be calculated dynamically based on speed test when autoChunk is true.</param>
-        public KDriveClient(string token, long driveId, bool autoChunk, int parallelism, ILogger<KDriveClient>? logger, HttpClient? httpClient = null, int? chunkSize = null)
+        /// <param name="httpClient">Custom HttpClient</param>
+        public KDriveClient(string token, long driveId, KDriveClientOptions options, ILogger<KDriveClient>? logger, HttpClient? httpClient = null)
         {
             DriveId = driveId;
-            Parallelism = parallelism;
+            Parallelism = options.Parallelism;
             Logger = logger;
-            string version = Assembly.GetEntryAssembly()?.GetName().Version?.ToString() ?? "unknown";
             HttpClient = httpClient ?? new HttpClient { BaseAddress = new Uri("https://api.infomaniak.com") };
             HttpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
             HttpClient.DefaultRequestHeaders.UserAgent.ParseAdd("kDriveClient.NET/" + GetVersion());
             this.Logger?.LogInformation("KDriveClient initialized with Drive ID: {DriveId}", DriveId);
 
-            if (autoChunk)
+            if (options.UseAutoChunkSize)
             {
                 this.Logger?.LogInformation("Auto chunking enabled, initializing upload strategy...");
-                InitializeUploadStrategyAsync(chunkSize).GetAwaiter().GetResult();
+                InitializeUploadStrategyAsync().GetAwaiter().GetResult();
                 this.Logger?.LogInformation("Upload strategy initialized with direct upload threshold: {Threshold} bytes and dynamic chunk size: {ChunkSize} bytes", DirectUploadThresholdBytes, DynamicChunkSizeBytes);
             }
-            else if (chunkSize is null) // If autoChunk is disabled and no custom chunk size provided, use a default
+            else if (options.ChunkSize is null) // If autoChunk is disabled and no custom chunk size provided, use a default
             {
                 DynamicChunkSizeBytes = 1024 * 1024; // Default to 1MB chunks
                 this.Logger?.LogInformation("Using default chunk size: {ChunkSize} bytes", DynamicChunkSizeBytes);
             }
             else
             {
-                DynamicChunkSizeBytes = chunkSize.Value;
+                DynamicChunkSizeBytes = (int)options.ChunkSize;
                 this.Logger?.LogInformation("Using custom chunk size: {ChunkSize} bytes", DynamicChunkSizeBytes);
             }
         }
 
         /// <summary>
         /// Uploads a file to kDrive, automatically determining the upload strategy based on file size.
+        /// Throws <see cref="ArgumentException"/> if the file is invalid.
         /// </summary>
-        /// <param name="file"><see cref="KDriveFile"/> to upload</param>
-        /// <param name="ct">Cancellation token to cancel the operation.</param>
-        /// <returns><see cref="KDriveUploadResponse"/> of your uploaded file</returns>
+        /// <param name="file">File to upload.</param>
+        /// <param name="ct">Cancellation token.</param>
+        /// <returns>Upload response.</returns>
         public async Task<KDriveUploadResponse> UploadAsync(KDriveFile file, CancellationToken ct = default)
         {
             file.SplitIntoChunks(this.DynamicChunkSizeBytes);
@@ -155,23 +170,39 @@ namespace kDriveClient.kDriveClient
         /// <exception cref="HttpRequestException"></exception>
         protected virtual async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken ct = default)
         {
-            using var lease = await RateLimiter.AcquireAsync(1, ct);
-            if (!lease.IsAcquired)
+            int maxRetries = 3;
+            int delay = 500;
+            var lastException = default(Exception);
+            for (int i = 0; i < maxRetries; i++)
             {
-                if (lease.TryGetMetadata("RETRY_AFTER", out var obj) && obj is TimeSpan retryAfter)
+                try
                 {
-                    Logger?.LogInformation("Rate limit reached. Retry-After {RetryAfter}", retryAfter);
-                    await Task.Delay(retryAfter, ct);
+                    using var lease = await RateLimiter.AcquireAsync(1, ct);
+                    if (!lease.IsAcquired)
+                    {
+                        if (lease.TryGetMetadata("RETRY_AFTER", out var obj) && obj is TimeSpan retryAfter)
+                        {
+                            Logger?.LogInformation("Rate limit reached. Retry-After {RetryAfter}", retryAfter);
+                            await Task.Delay(retryAfter, ct);
+                        }
+                        else
+                        {
+                            Logger?.LogWarning("Rate limit exceeded for request: {RequestMethod} {RequestUri}", request.Method, request.RequestUri);
+                            throw new HttpRequestException("Rate limit exceeded");
+                        }
+                    }
+
+                    Logger?.LogInformation("Sending request: {RequestMethod} {RequestUri}", request.Method, request.RequestUri);
+                    return await SendWithErrorHandlingAsync(request, ct);
                 }
-                else
+                catch (HttpRequestException ex) when (i < maxRetries - 1)
                 {
-                    Logger?.LogWarning("Rate limit exceeded for request: {RequestMethod} {RequestUri}", request.Method, request.RequestUri);
-                    throw new HttpRequestException("Rate limit exceeded");
+                    await Task.Delay(delay, ct);
+                    delay *= 2;
+                    lastException = ex;
                 }
             }
-
-            Logger?.LogInformation("Sending request: {RequestMethod} {RequestUri}", request.Method, request.RequestUri);
-            return await SendWithErrorHandlingAsync(request, ct);
+            throw new HttpRequestException("Maximum retry attempts exceeded", lastException);
         }
 
         /// <summary>

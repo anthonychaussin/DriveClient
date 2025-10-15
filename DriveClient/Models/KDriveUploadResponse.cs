@@ -95,17 +95,17 @@
         /// <summary>
         /// File or folder type.
         /// </summary>
-        public required string Type { get; set; }
+        public string Type { get; set; }
 
         /// <summary>
         /// Current status of the file.
         /// </summary>
-        public required string Status { get; set; }
+        public string Status { get; set; }
 
         /// <summary>
         /// Visibility of the file.
         /// </summary>
-        public required string Visibility { get; set; }
+        public string Visibility { get; set; }
 
         /// <summary>
         /// Drive ID associated with the file.

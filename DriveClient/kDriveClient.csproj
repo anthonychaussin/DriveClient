@@ -23,8 +23,7 @@ Native .NET logging support</Description>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <RepositoryUrl>https://github.com/anthonychaussin/DriveClient</RepositoryUrl>
     <PackageTags>infomaniak;kDrive;wrapper;c#;DotNet</PackageTags>
-    <PackageReleaseNotes>
-      ✨ New features
+    <PackageReleaseNotes>✨ New features
       - Improve chunk size estimation
       - Improve memory management
       - Complete kDrive File Object
@@ -35,8 +34,7 @@ Native .NET logging support</Description>
       - Add custom chunk size support and fix total_chunk_hash calculation
       - Add optional chunkSize parameter to KDriveClient constructor
       - Fix total_chunk_hash calculation to hash concatenated chunk hash hex strings
-      - Use IncrementalHash for efficient hash computation during file chunking
-    </PackageReleaseNotes>
+      - Use IncrementalHash for efficient hash computation during file chunking</PackageReleaseNotes>
     <NeutralLanguage>en</NeutralLanguage>
     <PackageLicenseFile>LICENSE.txt</PackageLicenseFile>
     <IncludeSymbols>True</IncludeSymbols>

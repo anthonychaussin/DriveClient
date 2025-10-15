@@ -1,4 +1,5 @@
-﻿using System.Text;
+﻿using System.Buffers;
+using System.Text;
 
 namespace kDriveClient.Models
 {
@@ -85,7 +86,8 @@ namespace kDriveClient.Models
                 throw new InvalidOperationException("Content stream is null.");
             }
 
-            var buffer = new byte[chunkSize];
+            var pool = ArrayPool<byte>.Shared;
+            var buffer = pool.Rent(chunkSize);
             int chunkNumber = 0;
             int bytesRead;
 
@@ -93,11 +95,14 @@ namespace kDriveClient.Models
             using var fileSha256 = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
             while ((bytesRead = this.Content.Read(buffer, 0, chunkSize)) > 0)
             {
-                byte[] content = [.. buffer.Take(bytesRead)];
-                var chunkHash = SHA256.HashData(content);
-                this.Chunks.Add(new KDriveChunk(content, chunkNumber++, chunkHash));
+                var chunkData = new byte[bytesRead];
+                Array.Copy(buffer, chunkData, bytesRead);
+                var chunkHash = SHA256.HashData(chunkData);
+                this.Chunks.Add(new KDriveChunk(chunkData, chunkNumber++, chunkHash));
                 fileSha256.AppendData(Encoding.UTF8.GetBytes(Convert.ToHexString(chunkHash).ToLowerInvariant()));
             }
+
+            pool.Return(buffer);
 
             this.Content.Dispose();
             GC.Collect();

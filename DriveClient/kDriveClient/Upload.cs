@@ -17,21 +17,7 @@ namespace kDriveClient.kDriveClient
         /// <exception cref="ArgumentException"></exception>
         public async Task<KDriveUploadResponse> UploadFileDirectAsync(KDriveFile file, CancellationToken ct = default)
         {
-            if (file.Content == null)
-            {
-                this.Logger?.LogError("File content is null or empty");
-                throw new ArgumentException("File content is required", nameof(file));
-            }
-            else if (string.IsNullOrWhiteSpace(file.Name))
-            {
-                this.Logger?.LogError("File name is null or empty");
-                throw new ArgumentException("File name is required", nameof(file));
-            }
-            else if (file.TotalSize <= 0)
-            {
-                this.Logger?.LogError("File size is less than or equal to 0");
-                throw new ArgumentException("File size must be greater than 0", nameof(file));
-            }
+            ValidateFile(file);
 
             this.Logger?.LogInformation("Starting direct upload for file '{FileName}' with size {FileSize} bytes...", file.Name, file.TotalSize);
             var response = await SendAsync(KDriveRequestFactory.CreateUploadDirectRequest(DriveId, file), ct);
@@ -59,11 +45,7 @@ namespace kDriveClient.kDriveClient
         /// <exception cref="ArgumentException"></exception>
         public async Task<KDriveUploadResponse> UploadFileChunkedAsync(KDriveFile file, CancellationToken ct = default)
         {
-            if (file.Content == null)
-            {
-                this.Logger?.LogError("File content is null or empty");
-                throw new ArgumentException("File content is required", nameof(file));
-            }
+            ValidateFile(file);
 
             this.Logger?.LogInformation("Starting chunked upload for file '{FileName}' with size {FileSize} bytes...", file.Name, file.TotalSize);
             var (sessionToken, uploadUrl) = await StartUploadSessionAsync(file, ct);
@@ -145,7 +127,7 @@ namespace kDriveClient.kDriveClient
 
             var uploaded = (chunk.ChunkNumber + 1) * chunk.ChunkSize;
             var percent = Math.Min(100.0, uploaded * 100.0 / file.TotalSize);
-            Progress?.Report(percent);
+            this.Progress?.Report(percent);
             this.Logger?.LogInformation("Chunk {ChunkNumber}/{TotalChunks} for file '{FileName}' uploaded successfully. Uploaded {UploadedSize} bytes ({Percent}%).",
                 chunk.ChunkNumber + 1, file.Chunks.Count, file.Name, uploaded, percent);
         }
@@ -197,6 +179,21 @@ namespace kDriveClient.kDriveClient
 
             this.Logger?.LogInformation("Upload session with token '{SessionToken}' cancelled successfully.", sessionToken);
             return await response.Content.ReadAsStringAsync(ct);
+        }
+
+        /// <summary>
+        /// Validates the file before upload.
+        /// </summary>
+        /// <param name="file">kDriveFile to validate</param>
+        /// <exception cref="ArgumentException">Exception thrown if validation fails</exception>
+        private static void ValidateFile(KDriveFile file)
+        {
+            if (file.Content == null)
+                throw new ArgumentException("File content is required", nameof(file));
+            if (string.IsNullOrWhiteSpace(file.Name) || file.Name.IndexOfAny(Path.GetInvalidFileNameChars()) >= 0)
+                throw new ArgumentException("File name is invalid", nameof(file));
+            if (file.TotalSize <= 0)
+                throw new ArgumentException("File size must be greater than 0", nameof(file));
         }
     }
 }
