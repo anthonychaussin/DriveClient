@@ -1,4 +1,5 @@
 ﻿using kDriveClient.Models;
+using System.Net;
 using System.Net.Http.Headers;
 
 namespace kDriveClient.Helpers
@@ -19,7 +20,7 @@ namespace kDriveClient.Helpers
             var url = $"/3/drive/{driveId}/upload?" + string.Join("&", BuildUploadQueryParams(file).ToList().ConvertAll(e => $"{e.Key}={e.Value}"));
             var request = new HttpRequestMessage(HttpMethod.Post, url)
             {
-                Content = new StreamContent(new MemoryStream(file.Chunks.First().Content))
+                Content = new StreamContent(new MemoryStream(file.Chunks.First().Content!))
             };
 
             request.Content.Headers.ContentType = new MediaTypeHeaderValue("application/octet-stream");
@@ -55,14 +56,14 @@ namespace kDriveClient.Helpers
         /// <returns>An HttpRequestMessage configured for the chunk upload operation.</returns>
         public static HttpRequestMessage CreateChunkUploadRequest(string baseUrl, string token, long driveId, KDriveChunk chunk)
         {
-            var request = new HttpRequestMessage(HttpMethod.Post, $"{baseUrl}/3/drive/{driveId}/upload/session/{token}/chunk?chunk_number={chunk.ChunkNumber + 1}&chunk_size={chunk.ChunkSize}&chunk_hash=sha256:{chunk.ChunkHash.ToLowerInvariant()}")
+            var content = new ReadOnlyMemoryContent(new ReadOnlyMemory<byte>(chunk.Content, 0, chunk.ChunkSize));
+            content.Headers.ContentType = new MediaTypeHeaderValue("application/octet-stream");
+            return new HttpRequestMessage(HttpMethod.Post, $"{baseUrl}/3/drive/{driveId}/upload/session/{token}/chunk?chunk_number={chunk.ChunkNumber + 1}&chunk_size={chunk.ChunkSize}&chunk_hash=sha256:{chunk.ChunkHash.ToLowerInvariant()}")
             {
-                Content = new ByteArrayContent(chunk.Content)
+                Content = content,
+                Version = HttpVersion.Version20,
+                VersionPolicy = HttpVersionPolicy.RequestVersionOrLower,
             };
-            request.Content.Headers.ContentType = new MediaTypeHeaderValue("application/octet-stream");
-            request.Content.Headers.ContentLength = chunk.ChunkSize;
-
-            return request;
         }
 
         /// <summary>
@@ -74,10 +75,10 @@ namespace kDriveClient.Helpers
         /// <returns>An HttpRequestMessage configured to finish the upload session.</returns>
         public static HttpRequestMessage CreateFinishSessionRequest(long driveId, string sessionToken, string totalChunkHash)
         {
-            var content = new StringContent(JsonSerializer.Serialize(new
+            var content = new StringContent(JsonSerializer.Serialize(new KDriveFinishRequest
             {
-                total_chunk_hash = $"sha256:{totalChunkHash.ToLowerInvariant()}"
-            }, KDriveJsonContext.Default.Object));
+                TotalChunkHash = $"sha256:{totalChunkHash.ToLowerInvariant()}"
+            }, KDriveJsonContext.Default.KDriveFinishRequest));
 
             content.Headers.ContentType = new MediaTypeHeaderValue("application/json");
 

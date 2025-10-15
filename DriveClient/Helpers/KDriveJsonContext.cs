@@ -1,5 +1,6 @@
 ﻿using kDriveClient.Models;
 using kDriveClient.Models.Exceptions;
+
 namespace kDriveClient.Helpers
 {
     /// <summary>
@@ -11,6 +12,8 @@ namespace kDriveClient.Helpers
     [JsonSerializable(typeof(KDriveFile))]
     [JsonSerializable(typeof(KDriveChunk))]
     [JsonSerializable(typeof(KDriveUploadResponseWraper))]
+    [JsonSerializable(typeof(KDriveFinishRequest))]
+    [JsonSerializable(typeof(KDriveUploadDataResponse))]
     [JsonSourceGenerationOptions(PropertyNameCaseInsensitive = true)]
     public partial class KDriveJsonContext : JsonSerializerContext
     {

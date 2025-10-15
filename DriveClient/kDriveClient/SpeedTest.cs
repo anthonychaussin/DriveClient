@@ -8,13 +8,29 @@ namespace kDriveClient.kDriveClient
     /// </summary>
     public partial class KDriveClient
     {
+        private const int MaxRequestsPerMinute = 60;
+        private const int MinChunkBytes = 100 * 1024 * 1024;
+        private const long MaxChunkBytes = 1L * 1024 * 1024 * 1024;
+        private const double Safety = 1.10;
+
         /// <summary>
         /// Initializes the upload strategy by performing a speed test.
         /// </summary>
+        /// <param name="customChunkSize">Optional custom chunk size in bytes. If specified, only DirectUploadThresholdBytes will be calculated from speed test.</param>
         /// <param name="ct">Cancellation token to cancel the operation.</param>
         /// <returns>A task that represents the asynchronous operation.</returns>
-        private async Task InitializeUploadStrategyAsync(CancellationToken ct = default)
+        private async Task InitializeUploadStrategyAsync(int? customChunkSize = null, CancellationToken ct = default)
         {
+            if (customChunkSize != null)
+            {
+                DynamicChunkSizeBytes = (int)customChunkSize;
+                DirectUploadThresholdBytes = (int)customChunkSize;
+                this.Logger?.LogInformation("Custom chunk size is provided. Speed test is no longer needed");
+                this.Logger?.LogInformation("Upload strategy initialized: DirectUploadThresholdBytes = {DirectUploadThresholdBytes}, DynamicChunkSizeBytes = {DynamicChunkSizeBytes} (custom)",
+                    DirectUploadThresholdBytes, DynamicChunkSizeBytes);
+                return;
+            }
+
             this.Logger?.LogInformation("Starting upload strategy initialization...");
             var buffer = new byte[1024 * 1024];
             RandomNumberGenerator.Fill(buffer);
@@ -62,11 +78,16 @@ namespace kDriveClient.kDriveClient
             await CancelUploadSessionRequest(SessionToken, ct);
             this.Logger?.LogInformation("Upload session finalized successfully.");
 
-            var speedBytesPerSec = buffer.Length / (sw.ElapsedMilliseconds / 1000.0);
+            var v = buffer.Length / Math.Max(0.001, sw.Elapsed.TotalSeconds);
+            Logger?.LogInformation("Measured upload speed: {SpeedF2} MB/s", v / (1024 * 1024.0));
 
-            DirectUploadThresholdBytes = (long)speedBytesPerSec;
-            DynamicChunkSizeBytes = (int)(speedBytesPerSec * 0.9);
-            this.Logger?.LogInformation("Upload strategy initialized: DirectUploadThresholdBytes = {DirectUploadThresholdBytes}, DynamicChunkSizeBytes = {DynamicChunkSizeBytes}",
+            var target = Math.Min(Math.Max((long)Math.Ceiling((long)Math.Ceiling(Parallelism * v * 60.0 / MaxRequestsPerMinute) * Safety), MinChunkBytes), MaxChunkBytes);
+
+            DynamicChunkSizeBytes = (int)target;
+
+            DirectUploadThresholdBytes = (long)(target * 1.5);
+
+            this.Logger?.LogInformation("Upload strategy initialized: DirectUploadThresholdBytes = {DirectUploadThresholdBytes}, DynamicChunkSizeBytes = {DynamicChunkSizeBytes} (calculated from speed test)",
                 DirectUploadThresholdBytes, DynamicChunkSizeBytes);
         }
     }

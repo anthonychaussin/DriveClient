@@ -1,10 +1,14 @@
-﻿namespace kDriveClient.Models
+﻿using System.Text;
+
+namespace kDriveClient.Models
 {
     /// <summary>
     /// KDriveFile represents a file in the kDrive system.
     /// </summary>
-    public class KDriveFile
+    public class KDriveFile : IDisposable
     {
+        private Int64 totalSize;
+
         /// <summary>
         /// CreatedAt is the timestamp when the file was created.
         /// </summary>
@@ -38,19 +42,22 @@
         /// <summary>
         /// TotalChunkHash is the SHA-256 hash of the entire file content, computed from all chunks.
         /// </summary>
-        public string TotalChunkHash
-        {
-            get
-            {
-                return Convert.ToHexString(
-                        SHA256.HashData(this.Content));
-            }
-        }
+        public string TotalChunkHash { get; set; } = string.Empty;
 
         /// <summary>
         /// TotalSize is the total size of the file in bytes, calculated as the sum of all chunk sizes.
         /// </summary>
-        public long TotalSize => this.Chunks.Sum(c => c.ChunkSize);
+        public long TotalSize
+        {
+            get
+            {
+                if (totalSize == 0)
+                {
+                    totalSize = this.Chunks.Sum(c => (long)c.ChunkSize);
+                }
+                return totalSize;
+            }
+        }
 
         /// <summary>
         /// Chunks is a list of KDriveChunk objects representing the file's content split into chunks.
@@ -60,7 +67,7 @@
         /// <summary>
         /// Content is a stream representing the file's content.
         /// </summary>
-        public required Stream Content { get; init; }
+        public Stream? Content { get; init; }
 
         /// <summary>
         /// In case of conflict with an existing file, it define how to manage the conflict
@@ -73,19 +80,31 @@
         /// <param name="chunkSize">Define the size of each chunk (except the last one)</param>
         public void SplitIntoChunks(int chunkSize)
         {
+            if (this.Content == null)
+            {
+                throw new InvalidOperationException("Content stream is null.");
+            }
+
             var buffer = new byte[chunkSize];
             int chunkNumber = 0;
             int bytesRead;
 
             this.Content.Position = 0;
-
+            using var fileSha256 = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
             while ((bytesRead = this.Content.Read(buffer, 0, chunkSize)) > 0)
             {
                 byte[] content = [.. buffer.Take(bytesRead)];
-                this.Chunks.Add(new KDriveChunk(content, chunkNumber++, SHA256.HashData(content)));
+                var chunkHash = SHA256.HashData(content);
+                this.Chunks.Add(new KDriveChunk(content, chunkNumber++, chunkHash));
+                fileSha256.AppendData(Encoding.UTF8.GetBytes(Convert.ToHexString(chunkHash).ToLowerInvariant()));
             }
 
-            this.Content.Position = 0;
+            this.Content.Dispose();
+            GC.Collect();
+
+            this.TotalChunkHash = this.Chunks.Count > 1 ?
+                this.TotalChunkHash = Convert.ToHexString(fileSha256.GetHashAndReset())
+                : this.Chunks.First().ChunkHash;
         }
 
         /// <summary>
@@ -110,6 +129,16 @@
                 ConflictChoice.Rename => "rename",
                 _ => "error"
             };
+        }
+
+        /// <summary>
+        /// Frees resources used by the KDriveFile instance.
+        /// </summary>
+        public void Dispose()
+        {
+            this.Chunks.ForEach(c => c.Dispose());
+
+            GC.SuppressFinalize(this);
         }
     }
 }

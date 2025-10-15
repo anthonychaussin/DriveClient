@@ -1,5 +1,7 @@
 ﻿using kDriveClient.Helpers;
 using kDriveClient.Models;
+using System.Diagnostics;
+using System.Diagnostics.CodeAnalysis;
 using System.Net.Http.Headers;
 using System.Reflection;
 using System.Threading.RateLimiting;
@@ -36,7 +38,7 @@ namespace kDriveClient.kDriveClient
         /// </summary>
         private RateLimiter RateLimiter { get; set; } = new FixedWindowRateLimiter(new FixedWindowRateLimiterOptions
         {
-            PermitLimit = 60,
+            PermitLimit = 59,
             Window = TimeSpan.FromMinutes(1),
             AutoReplenishment = true
         });
@@ -81,7 +83,7 @@ namespace kDriveClient.kDriveClient
         /// <param name="autoChunk">Choose if we should make a speed test to optimize chunks</param>
         /// <param name="parallelism">Number of parrallels threads</param>
         /// <param name="logger">Logger</param>
-        public KDriveClient(string token, long driveId, bool autoChunk, int parallelism, ILogger<KDriveClient>? logger) : this(token, driveId, autoChunk, parallelism, logger, null)
+        public KDriveClient(string token, long driveId, bool autoChunk, int parallelism, ILogger<KDriveClient>? logger) : this(token, driveId, autoChunk, parallelism, logger, null, null)
         { }
 
         /// <summary>
@@ -93,7 +95,8 @@ namespace kDriveClient.kDriveClient
         /// <param name="parallelism">Number of parrallels threads</param>
         /// <param name="logger">Logger</param>
         /// <param name="httpClient">Custome HttpClient</param>
-        public KDriveClient(string token, long driveId, bool autoChunk, int parallelism, ILogger<KDriveClient>? logger, HttpClient? httpClient = null)
+        /// <param name="chunkSize">Optional custom chunk size in bytes. If not specified, will be calculated dynamically based on speed test when autoChunk is true.</param>
+        public KDriveClient(string token, long driveId, bool autoChunk, int parallelism, ILogger<KDriveClient>? logger, HttpClient? httpClient = null, int? chunkSize = null)
         {
             DriveId = driveId;
             Parallelism = parallelism;
@@ -101,13 +104,24 @@ namespace kDriveClient.kDriveClient
             string version = Assembly.GetEntryAssembly()?.GetName().Version?.ToString() ?? "unknown";
             HttpClient = httpClient ?? new HttpClient { BaseAddress = new Uri("https://api.infomaniak.com") };
             HttpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
-            HttpClient.DefaultRequestHeaders.UserAgent.ParseAdd("kDriveClient.NET/version");
+            HttpClient.DefaultRequestHeaders.UserAgent.ParseAdd("kDriveClient.NET/" + GetVersion());
             this.Logger?.LogInformation("KDriveClient initialized with Drive ID: {DriveId}", DriveId);
+
             if (autoChunk)
             {
                 this.Logger?.LogInformation("Auto chunking enabled, initializing upload strategy...");
-                InitializeUploadStrategyAsync().GetAwaiter().GetResult();
+                InitializeUploadStrategyAsync(chunkSize).GetAwaiter().GetResult();
                 this.Logger?.LogInformation("Upload strategy initialized with direct upload threshold: {Threshold} bytes and dynamic chunk size: {ChunkSize} bytes", DirectUploadThresholdBytes, DynamicChunkSizeBytes);
+            }
+            else if (chunkSize is null) // If autoChunk is disabled and no custom chunk size provided, use a default
+            {
+                DynamicChunkSizeBytes = 1024 * 1024; // Default to 1MB chunks
+                this.Logger?.LogInformation("Using default chunk size: {ChunkSize} bytes", DynamicChunkSizeBytes);
+            }
+            else
+            {
+                DynamicChunkSizeBytes = chunkSize.Value;
+                this.Logger?.LogInformation("Using custom chunk size: {ChunkSize} bytes", DynamicChunkSizeBytes);
             }
         }
 
@@ -141,10 +155,19 @@ namespace kDriveClient.kDriveClient
         /// <exception cref="HttpRequestException"></exception>
         protected virtual async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken ct = default)
         {
-            if (!(await RateLimiter.AcquireAsync(1, ct)).IsAcquired)
+            using var lease = await RateLimiter.AcquireAsync(1, ct);
+            if (!lease.IsAcquired)
             {
-                Logger?.LogWarning("Rate limit exceeded for request: {RequestMethod} {RequestUri}", request.Method, request.RequestUri);
-                throw new HttpRequestException("Rate limit exceeded");
+                if (lease.TryGetMetadata("RETRY_AFTER", out var obj) && obj is TimeSpan retryAfter)
+                {
+                    Logger?.LogInformation("Rate limit reached. Retry-After {RetryAfter}", retryAfter);
+                    await Task.Delay(retryAfter, ct);
+                }
+                else
+                {
+                    Logger?.LogWarning("Rate limit exceeded for request: {RequestMethod} {RequestUri}", request.Method, request.RequestUri);
+                    throw new HttpRequestException("Rate limit exceeded");
+                }
             }
 
             Logger?.LogInformation("Sending request: {RequestMethod} {RequestUri}", request.Method, request.RequestUri);
@@ -159,9 +182,35 @@ namespace kDriveClient.kDriveClient
         /// <returns><see cref="HttpResponseMessage"/></returns>
         private async Task<HttpResponseMessage> SendWithErrorHandlingAsync(HttpRequestMessage request, CancellationToken ct = default)
         {
-            var response = await HttpClient.SendAsync(request, ct);
+            var response = await HttpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, ct);
 
             return await KDriveJsonHelper.DeserializeResponseAsync(response, ct);
+        }
+
+        /// <summary>
+        /// Gets the version of the assembly.
+        /// </summary>
+        /// <returns>The verstion of the assembly</returns>
+        [RequiresAssemblyFiles("Calls System.Reflection.Assembly.Location")]
+        private static string GetVersion()
+        {
+            var asm = typeof(KDriveClient).Assembly;
+            var infoVer = asm.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion;
+            if (!string.IsNullOrWhiteSpace(infoVer)) return infoVer;
+            var asmVer = asm.GetName().Version?.ToString();
+            if (!string.IsNullOrWhiteSpace(asmVer)) return asmVer;
+            try
+            {
+                var loc = asm.Location;
+                if (!string.IsNullOrWhiteSpace(loc))
+                {
+                    var fvi = FileVersionInfo.GetVersionInfo(loc);
+                    if (!string.IsNullOrWhiteSpace(fvi.FileVersion)) return fvi.FileVersion!;
+                }
+            }
+            catch { }
+
+            return "unknown";
         }
     }
 }
