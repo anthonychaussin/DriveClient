@@ -23,10 +23,20 @@ Native .NET logging support</Description>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <RepositoryUrl>https://github.com/anthonychaussin/DriveClient</RepositoryUrl>
     <PackageTags>infomaniak;kDrive;wrapper;c#;DotNet</PackageTags>
-    <PackageReleaseNotes>✨ New features
-- Add optional chunkSize parameter to KDriveClient constructor
-- bypass speed test if custom chunk size is provided
-- fix user-agent version</PackageReleaseNotes>
+    <PackageReleaseNotes>
+      ✨ New features
+      - Improve chunk size estimation
+      - Improve memory management
+      - Complete kDrive File Object
+      - Fix upload response wrapper
+      - fix hash computation
+      - bypass speed test if custom chunk size is provided
+      - fix user-agent version
+      - Add custom chunk size support and fix total_chunk_hash calculation
+      - Add optional chunkSize parameter to KDriveClient constructor
+      - Fix total_chunk_hash calculation to hash concatenated chunk hash hex strings
+      - Use IncrementalHash for efficient hash computation during file chunking
+    </PackageReleaseNotes>
     <NeutralLanguage>en</NeutralLanguage>
     <PackageLicenseFile>LICENSE.txt</PackageLicenseFile>
     <IncludeSymbols>True</IncludeSymbols>
