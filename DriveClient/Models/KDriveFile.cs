@@ -67,7 +67,7 @@ namespace kDriveClient.Models
         /// <summary>
         /// Content is a stream representing the file's content.
         /// </summary>
-        public Stream Content { get; init; }
+        public Stream? Content { get; init; }
 
         /// <summary>
         /// In case of conflict with an existing file, it define how to manage the conflict
@@ -80,6 +80,11 @@ namespace kDriveClient.Models
         /// <param name="chunkSize">Define the size of each chunk (except the last one)</param>
         public void SplitIntoChunks(int chunkSize)
         {
+            if (this.Content == null)
+            {
+                throw new InvalidOperationException("Content stream is null.");
+            }
+
             var buffer = new byte[chunkSize];
             int chunkNumber = 0;
             int bytesRead;

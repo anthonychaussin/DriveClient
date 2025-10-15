@@ -1,6 +1,7 @@
 ﻿using kDriveClient.Helpers;
 using kDriveClient.Models;
 using System.Diagnostics;
+using System.Diagnostics.CodeAnalysis;
 using System.Net.Http.Headers;
 using System.Reflection;
 using System.Threading.RateLimiting;
@@ -190,6 +191,7 @@ namespace kDriveClient.kDriveClient
         /// Gets the version of the assembly.
         /// </summary>
         /// <returns>The verstion of the assembly</returns>
+        [RequiresAssemblyFiles("Calls System.Reflection.Assembly.Location")]
         private static string GetVersion()
         {
             var asm = typeof(KDriveClient).Assembly;

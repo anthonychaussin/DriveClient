@@ -13,7 +13,7 @@ namespace kDriveClientTests.kDriveClient
         {
             var response = new HttpResponseMessage(HttpStatusCode.OK)
             {
-                Content = new StringContent("{\"result\":\"success\",\"data\":{\"file\":{\"id\":123,\"name\":\"example.txt\",\"path\":\"/Private/\",\"hash\":\"test\",\"mime_type\":\"text/text\"}}}")
+                Content = new StringContent("""{"result":"success","data":{"file":{"id":123,"name":"example.txt","path":"/Private","hash":"test","mime_type":"text/text", "visibility": "private_folder", "status": "ok", "type": "file"}}}""")
             };
 
             var handler = new FakeHttpMessageHandler(response);
