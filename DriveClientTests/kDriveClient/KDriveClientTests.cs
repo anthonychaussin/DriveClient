@@ -13,7 +13,7 @@ namespace kDriveClientTests.kDriveClient
         {
             var response = new HttpResponseMessage(HttpStatusCode.OK)
             {
-                Content = new StringContent("{\"Result\":\"success\",\"Data\":{\"id\":123,\"name\":\"example.txt\",\"path\":\"/Private/\",\"hash\":\"test\",\"mime_type\":\"text/text\"}}")
+                Content = new StringContent("{\"result\":\"success\",\"data\":{\"file\":{\"id\":123,\"name\":\"example.txt\",\"path\":\"/Private/\",\"hash\":\"test\",\"mime_type\":\"text/text\"}}}")
             };
 
             var handler = new FakeHttpMessageHandler(response);
@@ -25,7 +25,7 @@ namespace kDriveClientTests.kDriveClient
                 DirectoryPath = "/documents",
                 Content = new MemoryStream([1, 2, 3])
             };
-            file.SplitIntoChunks(1000);
+
             var result = await client.UploadAsync(file);
 
             Assert.AreEqual(123, result.Id);

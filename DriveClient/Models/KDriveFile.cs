@@ -42,7 +42,7 @@ namespace kDriveClient.Models
         /// <summary>
         /// TotalChunkHash is the SHA-256 hash of the entire file content, computed from all chunks.
         /// </summary>
-        public string TotalChunkHash { get; set; }
+        public string TotalChunkHash { get; set; } = string.Empty;
 
         /// <summary>
         /// TotalSize is the total size of the file in bytes, calculated as the sum of all chunk sizes.
@@ -51,7 +51,7 @@ namespace kDriveClient.Models
         {
             get
             {
-                if(totalSize == 0)
+                if (totalSize == 0)
                 {
                     totalSize = this.Chunks.Sum(c => (long)c.ChunkSize);
                 }
@@ -67,7 +67,7 @@ namespace kDriveClient.Models
         /// <summary>
         /// Content is a stream representing the file's content.
         /// </summary>
-        public required Stream Content { get; init; }
+        public Stream Content { get; init; }
 
         /// <summary>
         /// In case of conflict with an existing file, it define how to manage the conflict
@@ -126,10 +126,13 @@ namespace kDriveClient.Models
             };
         }
 
+        /// <summary>
+        /// Frees resources used by the KDriveFile instance.
+        /// </summary>
         public void Dispose()
         {
             this.Chunks.ForEach(c => c.Dispose());
-            
+
             GC.SuppressFinalize(this);
         }
     }

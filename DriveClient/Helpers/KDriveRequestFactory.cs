@@ -20,7 +20,7 @@ namespace kDriveClient.Helpers
             var url = $"/3/drive/{driveId}/upload?" + string.Join("&", BuildUploadQueryParams(file).ToList().ConvertAll(e => $"{e.Key}={e.Value}"));
             var request = new HttpRequestMessage(HttpMethod.Post, url)
             {
-                Content = new StreamContent(new MemoryStream(file.Chunks.First().Content))
+                Content = new StreamContent(new MemoryStream(file.Chunks.First().Content!))
             };
 
             request.Content.Headers.ContentType = new MediaTypeHeaderValue("application/octet-stream");

@@ -1,7 +1,6 @@
 ﻿using kDriveClient.Helpers;
 using kDriveClient.Models;
 using System.Diagnostics;
-using System.Net;
 using System.Net.Http.Headers;
 using System.Reflection;
 using System.Threading.RateLimiting;
@@ -104,7 +103,7 @@ namespace kDriveClient.kDriveClient
             string version = Assembly.GetEntryAssembly()?.GetName().Version?.ToString() ?? "unknown";
             HttpClient = httpClient ?? new HttpClient { BaseAddress = new Uri("https://api.infomaniak.com") };
             HttpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
-            HttpClient.DefaultRequestHeaders.UserAgent.ParseAdd("kDriveClient.NET/"+GetVersion());
+            HttpClient.DefaultRequestHeaders.UserAgent.ParseAdd("kDriveClient.NET/" + GetVersion());
             this.Logger?.LogInformation("KDriveClient initialized with Drive ID: {DriveId}", DriveId);
 
             if (autoChunk)
@@ -118,7 +117,7 @@ namespace kDriveClient.kDriveClient
                 DynamicChunkSizeBytes = 1024 * 1024; // Default to 1MB chunks
                 this.Logger?.LogInformation("Using default chunk size: {ChunkSize} bytes", DynamicChunkSizeBytes);
             }
-            else 
+            else
             {
                 DynamicChunkSizeBytes = chunkSize.Value;
                 this.Logger?.LogInformation("Using custom chunk size: {ChunkSize} bytes", DynamicChunkSizeBytes);
@@ -187,7 +186,11 @@ namespace kDriveClient.kDriveClient
             return await KDriveJsonHelper.DeserializeResponseAsync(response, ct);
         }
 
-        static string GetVersion()
+        /// <summary>
+        /// Gets the version of the assembly.
+        /// </summary>
+        /// <returns>The verstion of the assembly</returns>
+        private static string GetVersion()
         {
             var asm = typeof(KDriveClient).Assembly;
             var infoVer = asm.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion;
@@ -203,7 +206,7 @@ namespace kDriveClient.kDriveClient
                     if (!string.IsNullOrWhiteSpace(fvi.FileVersion)) return fvi.FileVersion!;
                 }
             }
-            catch {}
+            catch { }
 
             return "unknown";
         }

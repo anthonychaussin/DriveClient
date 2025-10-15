@@ -12,6 +12,7 @@ namespace kDriveClient.kDriveClient
         private const int MinChunkBytes = 100 * 1024 * 1024;
         private const long MaxChunkBytes = 1L * 1024 * 1024 * 1024;
         private const double Safety = 1.10;
+
         /// <summary>
         /// Initializes the upload strategy by performing a speed test.
         /// </summary>
@@ -81,7 +82,7 @@ namespace kDriveClient.kDriveClient
             Logger?.LogInformation("Measured upload speed: {SpeedF2} MB/s", v / (1024 * 1024.0));
 
             var target = Math.Min(Math.Max((long)Math.Ceiling((long)Math.Ceiling(Parallelism * v * 60.0 / MaxRequestsPerMinute) * Safety), MinChunkBytes), MaxChunkBytes);
-            
+
             DynamicChunkSizeBytes = (int)target;
 
             DirectUploadThresholdBytes = (long)(target * 1.5);

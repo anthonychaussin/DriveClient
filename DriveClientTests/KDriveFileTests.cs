@@ -33,7 +33,14 @@ namespace kDriveClientTests
             foreach (var chunk in file.Chunks)
             {
                 Assert.IsFalse(string.IsNullOrWhiteSpace(chunk.ChunkHash));
-                Assert.AreEqual(chunk.Content.Length, chunk.ChunkSize);
+                if(chunk != file.Chunks.Last())
+                {
+                    Assert.AreEqual(1000, chunk.ChunkSize);
+                }
+                else
+                {
+                    Assert.AreEqual(totalSize % 1000 == 0 ? 1000 : totalSize % 1000, chunk.ChunkSize);
+                }
             }
 
             Assert.IsFalse(string.IsNullOrWhiteSpace(file.TotalChunkHash));

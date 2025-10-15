@@ -25,11 +25,17 @@
         /// </summary>
         public byte[]? Content { get; private set; } = content;
 
+        /// <summary>
+        /// Frees resources used by the KDriveChunk.
+        /// </summary>
         public void Dispose()
         {
             GC.SuppressFinalize(this);
         }
 
+        /// <summary>
+        /// Deletes the content of the chunk to free memory.
+        /// </summary>
         internal void Clean()
         {
             this.Content = null;

@@ -58,7 +58,7 @@ namespace kDriveClient.Helpers
                 try
                 {
                     await using var stream = await response.Content.ReadAsStreamAsync(ct);
-                    error = await JsonSerializer.DeserializeAsync( stream, KDriveJsonContext.Default.KDriveErrorResponse, cancellationToken: ct);
+                    error = await JsonSerializer.DeserializeAsync(stream, KDriveJsonContext.Default.KDriveErrorResponse, cancellationToken: ct);
                 }
                 catch
                 {

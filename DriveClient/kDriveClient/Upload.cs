@@ -68,15 +68,16 @@ namespace kDriveClient.kDriveClient
             this.Logger?.LogInformation("Starting chunked upload for file '{FileName}' with size {FileSize} bytes...", file.Name, file.TotalSize);
             var (sessionToken, uploadUrl) = await StartUploadSessionAsync(file, ct);
             this.Logger?.LogInformation("Upload session started with token '{SessionToken}' and URL '{UploadUrl}' for file '{FileName}'.", sessionToken, uploadUrl, file.Name);
-            try { 
+            try
+            {
                 await Parallel.ForEachAsync(file.Chunks, new ParallelOptions
                 {
                     MaxDegreeOfParallelism = Parallelism,
                     CancellationToken = ct
                 }, async (chunk, token) =>
                 {
-                            this.Logger?.LogInformation("Uploading chunk {ChunkNumber}/{TotalChunks} for file '{FileName}'...", chunk.ChunkNumber + 1, file.Chunks.Count, file.Name);
-                            await UploadChunkAsync(uploadUrl, sessionToken, chunk, file, token);
+                    this.Logger?.LogInformation("Uploading chunk {ChunkNumber}/{TotalChunks} for file '{FileName}'...", chunk.ChunkNumber + 1, file.Chunks.Count, file.Name);
+                    await UploadChunkAsync(uploadUrl, sessionToken, chunk, file, token);
                     chunk.Clean();
                 });
 
@@ -128,7 +129,7 @@ namespace kDriveClient.kDriveClient
         {
             this.Logger?.LogInformation("Uploading chunk {ChunkNumber}/{TotalChunks} for file '{FileName}' with size {ChunkSize} bytes...",
                 chunk.ChunkNumber + 1, file.Chunks.Count, file.Name, chunk.ChunkSize);
-            
+
             var response = await SendAsync(KDriveRequestFactory.CreateChunkUploadRequest(uploadUrl, sessionToken, this.DriveId, chunk), ct);
             try
             {
