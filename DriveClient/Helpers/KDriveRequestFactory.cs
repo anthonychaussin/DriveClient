@@ -107,7 +107,11 @@ namespace kDriveClient.Helpers
         /// <returns>An HttpRequestMessage configured for the download operation.</returns>
         public static HttpRequestMessage CreateDownloadRequest(long driveId, long fileId)
         {
-            return new HttpRequestMessage(HttpMethod.Get, $"/2/drive/{driveId}/files/{fileId}/download");
+            return new HttpRequestMessage(HttpMethod.Get, $"/2/drive/{driveId}/files/{fileId}/download")
+            {
+                Version = HttpVersion.Version20,
+                VersionPolicy = HttpVersionPolicy.RequestVersionOrHigher
+            };
         }
 
         /// <summary>

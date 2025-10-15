@@ -16,20 +16,20 @@ namespace kDriveClient.kDriveClient
         Task<KDriveUploadResponse> UploadAsync(KDriveFile file, CancellationToken ct = default);
 
         /// <summary>
-        /// Downloads a file from kDrive by its ID.
-        /// </summary>
-        /// <param name="fileId">File ID.</param>
-        /// <param name="ct">Cancellation token to cancel the operation.</param>
-        /// <returns>Stream containing the file Data.</returns>
-        Task<Stream> DownloadFileAsync(long fileId, CancellationToken ct = default);
-
-        /// <summary>
         /// Downloads a file from kDrive by its ID and writes it directly to a destination stream.
         /// </summary>
         /// <param name="fileId">File ID.</param>
-        /// <param name="destination">Destination stream to write the file Data.</param>
+        /// <param name="filePath">Destination file path.</param>
         /// <param name="ct">Cancellation token to cancel the operation.</param>
         /// <returns>Task representing the asynchronous operation.</returns>
-        Task DownloadFileAsync(long fileId, Stream destination, CancellationToken ct = default);
+        Task DownloadFileAsync(long fileId, string filePath, CancellationToken ct = default);
+
+        /// <summary>
+        /// Downloads a file from kDrive by its ID and returns it as a stream.
+        /// </summary>
+        /// <param name="fileId">File ID.</param>
+        /// <param name="ct">Cancellation token to cancel the operation.</param>
+        /// <returns>Stream containing the file content.</returns>
+        Task<Stream> DownloadFileAsync(long fileId, CancellationToken ct = default);
     }
 }
