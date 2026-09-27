@@ -1,7 +1,7 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFramework>net9.0</TargetFramework>
+    <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <ApplicationIcon>kDriveClientIcon.ico</ApplicationIcon>
@@ -9,40 +9,26 @@
     <GeneratePackageOnBuild>True</GeneratePackageOnBuild>
     <Title>$(AssemblyName)</Title>
     <Authors>Anthony Chaussin</Authors>
-    <Description>kDriveClient is a modern C# SDK to simplify file upload and download with Infomaniak kDrive API, including:
-
-Automatic direct or chunked upload
-Dynamic chunk size based on your actual bandwidth
-Download with redirect support
-Built-in rate limiting (60 requests/min)
-Strong error handling (deserialized API errors)
-Native .NET logging support</Description>
+    <Description>kDriveClient is a modern C# SDK for the Infomaniak kDrive API: parallel chunked upload, download, typed endpoints, DI support, and built-in rate limiting.</Description>
     <Copyright>Copyright (c) 2025 Anthony Chaussin</Copyright>
     <PackageProjectUrl>https://github.com/anthonychaussin/DriveClient</PackageProjectUrl>
     <PackageIcon>kDriveClientIcon.png</PackageIcon>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <RepositoryUrl>https://github.com/anthonychaussin/DriveClient</RepositoryUrl>
     <PackageTags>infomaniak;kDrive;wrapper;c#;DotNet</PackageTags>
-    <PackageReleaseNotes>
-      ✨ New features
-      - Improve chunk size estimation
-      - Improve memory management
-      - Complete kDrive File Object
-      - Fix upload response wrapper
-      - fix hash computation
-      - bypass speed test if custom chunk size is provided
-      - fix user-agent version
-      - Add custom chunk size support and fix total_chunk_hash calculation
-      - Add optional chunkSize parameter to KDriveClient constructor
-      - Fix total_chunk_hash calculation to hash concatenated chunk hash hex strings
-      - Use IncrementalHash for efficient hash computation during file chunking
-    </PackageReleaseNotes>
+    <PackageReleaseNotes>2.0.0
+- Unified HTTP pipeline with a single shared rate limiter
+- Real parallel chunked uploads (Parallelism)
+- Domain interfaces: IKDriveUpload, IKDriveDownload, IKDriveFiles, IKDriveShares, …
+- KDriveClient.CreateAsync + AddKDriveClient DI registration
+- Removed KDriveFileUploader, Newtonsoft.Json
+- Renamed KDriveUploadResponseWrapper / fixed typos</PackageReleaseNotes>
     <NeutralLanguage>en</NeutralLanguage>
     <PackageLicenseFile>LICENSE.txt</PackageLicenseFile>
     <IncludeSymbols>True</IncludeSymbols>
     <EnforceCodeStyleInBuild>True</EnforceCodeStyleInBuild>
     <TrimmerDefaultAction>link</TrimmerDefaultAction>
-    <Version>1.0.3</Version>
+    <Version>2.0.0</Version>
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
@@ -52,6 +38,10 @@ Native .NET logging support</Description>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|AnyCPU'">
     <IsAotCompatible>True</IsAotCompatible>
   </PropertyGroup>
+
+  <ItemGroup>
+    <None Remove="infomaniak_api_kdrive.json" />
+  </ItemGroup>
 
   <ItemGroup>
     <Content Include="kDriveClientIcon.ico" />
@@ -69,9 +59,12 @@ Native .NET logging support</Description>
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="9.0.6" />
-    <PackageReference Include="Microsoft.Extensions.Logging.Console" Version="9.0.6" />
-    <PackageReference Include="System.Threading.RateLimiting" Version="9.0.6" />
+    <PackageReference Include="Microsoft.Extensions.Http" Version="10.0.10" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.10" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.10" />
+    <PackageReference Include="Microsoft.Extensions.Options" Version="10.0.10" />
+    <PackageReference Include="System.IO.Hashing" Version="10.0.0" />
+    <PackageReference Include="System.Threading.RateLimiting" Version="10.0.10" />
   </ItemGroup>
 
   <ItemGroup>

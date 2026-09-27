@@ -21,7 +21,7 @@
         /// <returns></returns>
         public override string ToString()
         {
-            return $"Result: {Result}, Code: {Error?.Code}, Description: {Error?.Description}";
+            return $"Result={Result}, Error={Error}, ExtraDataCount={ExtraDataCount}";
         }
     }
 }

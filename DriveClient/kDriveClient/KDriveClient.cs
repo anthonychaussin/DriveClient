@@ -1,4 +1,7 @@
-﻿using kDriveClient.Helpers;
+using kDriveClient.kDriveClient.Application.Endpoints;
+using kDriveClient.kDriveClient.Application.Upload;
+using kDriveClient.kDriveClient.Infrastructure.Api;
+using kDriveClient.kDriveClient.Interface;
 using kDriveClient.Models;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
@@ -9,188 +12,209 @@ using System.Threading.RateLimiting;
 namespace kDriveClient.kDriveClient
 {
     /// <summary>
-    /// A client for interacting with the kDrive API, providing methods for uploading and downloading files,
+    /// A client for interacting with the kDrive API, providing methods for uploading and downloading files.
     /// </summary>
     public partial class KDriveClient : IKDriveClient
     {
-        /// <summary>
-        /// Logger for logging information, warnings, and errors.
-        /// </summary>
         private ILogger<KDriveClient>? Logger { get; set; }
 
         /// <summary>
-        /// The ID of the drive to which files will be uploaded or from which files will be downloaded.
+        /// Current drive id used for API calls. Updated by <see cref="RebindDriveId"/> / <see cref="BootstrapAsync"/>.
         /// </summary>
-        private Int64 DriveId { get; set; }
+        public long DriveId { get; private set; }
 
-        /// <summary>
-        /// HttpClient used to send requests to the kDrive API.
-        /// </summary>
         private HttpClient HttpClient { get; set; }
 
-        /// <summary>
-        /// Number of parallel threads to use for chunked uploads.
-        /// </summary>
-        private Int32 Parallelism { get; set; } = 4;
+        private KDriveHttpPipeline Pipeline { get; set; }
 
         /// <summary>
-        /// Rate limiter to control the rate of requests sent to the kDrive API according to their rate limits
+        /// Number of parallel chunk uploads.
         /// </summary>
-        private RateLimiter RateLimiter { get; set; } = new FixedWindowRateLimiter(new FixedWindowRateLimiterOptions
+        public Int32 Parallelism { get; private set; } = 4;
+
+        private IKDriveUploadService UploadService { get; set; }
+
+        private IKDriveEndpointsService EndpointsService { get; set; }
+
+        /// <summary>
+        /// Shared rate limiter (endpoints + uploads). Exposed for tests.
+        /// </summary>
+        private RateLimiter RateLimiter
         {
-            PermitLimit = 59,
-            Window = TimeSpan.FromMinutes(1),
-            AutoReplenishment = true
-        });
+            get => Pipeline.RateLimiter;
+            set => Pipeline.RateLimiter = value;
+        }
 
-        /// <summary>
-        /// Direct upload threshold in bytes. Files smaller than this size will be uploaded directly.
-        /// </summary>
         private Int64 DirectUploadThresholdBytes { get; set; }
 
         /// <summary>
-        /// Dynamic chunk size in bytes. This is determined based on the speed test and is used for chunked uploads.
+        /// Dynamic chunk size in bytes after strategy initialization.
         /// </summary>
-        private Int32 DynamicChunkSizeBytes { get; set; }
+        public Int32 DynamicChunkSizeBytes { get; private set; }
 
         /// <summary>
-        /// Progress reporter for tracking upload progress.
+        /// Progress reporter for tracking upload progress (0.0–1.0).
         /// </summary>
         public IProgress<double>? Progress { get; set; }
+
+        private KDriveUploadOptions _uploadOptions = new();
+        private readonly SemaphoreSlim _initLock = new(1, 1);
+        private bool _uploadInitialized;
 
         /// <summary>
         /// Constructs a new instance of the KDriveClient.
         /// </summary>
-        /// <param name="token">Bearer token</param>
-        /// <param name="driveId">Drive ID</param>
-        public KDriveClient(string token, long driveId) : this(token, driveId, true, 4, null)
+        public KDriveClient(string token, long driveId) : this(token, driveId, new KDriveUploadOptions())
         { }
 
         /// <summary>
         /// Constructs a new instance of the KDriveClient with optional logging.
         /// </summary>
-        /// <param name="token">Bearer token</param>
-        /// <param name="driveId">Drive ID</param>
-        /// <param name="logger">Logger</param>
-        public KDriveClient(string token, long driveId, ILogger<KDriveClient>? logger) : this(token, driveId, true, 4, logger)
+        public KDriveClient(string token, long driveId, ILogger<KDriveClient>? logger) : this(token, driveId, new KDriveUploadOptions(), logger)
+        { }
+
+        /// <summary>
+        /// Constructs a new instance of the KDriveClient with custom options.
+        /// </summary>
+        public KDriveClient(string token, long driveId, KDriveUploadOptions options) : this(token, driveId, options, null)
+        { }
+
+        /// <summary>
+        /// Constructs a new instance of the KDriveClient with custom HttpClient.
+        /// </summary>
+        public KDriveClient(string token, long driveId, HttpClient? httpClient) : this(token, driveId, new KDriveUploadOptions(), null, httpClient)
         { }
 
         /// <summary>
         /// Constructs a new instance of the KDriveClient with auto-chunking and parallelism options.
         /// </summary>
-        /// <param name="token">Bearer token</param>
-        /// <param name="driveId">Drive ID</param>
-        /// <param name="autoChunk">Choose if we should make a speed test to optimize chunks</param>
-        /// <param name="parallelism">Number of parrallels threads</param>
-        /// <param name="logger">Logger</param>
-        public KDriveClient(string token, long driveId, bool autoChunk, int parallelism, ILogger<KDriveClient>? logger) : this(token, driveId, autoChunk, parallelism, logger, null, null)
+        public KDriveClient(string token, long driveId, KDriveUploadOptions options, ILogger<KDriveClient>? logger) : this(token, driveId, options, logger, null)
         { }
 
         /// <summary>
         /// Constructs a new instance of the KDriveClient with auto-chunking, parallelism, and custom HttpClient.
+        /// Upload strategy probing is deferred until the first upload (or <see cref="CreateAsync"/>).
         /// </summary>
-        /// <param name="token">Bearer token</param>
-        /// <param name="driveId">Drive ID</param>
-        /// <param name="autoChunk">Choose if we should make a speed test to optimize chunks</param>
-        /// <param name="parallelism">Number of parrallels threads</param>
-        /// <param name="logger">Logger</param>
-        /// <param name="httpClient">Custome HttpClient</param>
-        /// <param name="chunkSize">Optional custom chunk size in bytes. If not specified, will be calculated dynamically based on speed test when autoChunk is true.</param>
-        public KDriveClient(string token, long driveId, bool autoChunk, int parallelism, ILogger<KDriveClient>? logger, HttpClient? httpClient = null, int? chunkSize = null)
+        public KDriveClient(string token, long driveId, KDriveUploadOptions options, ILogger<KDriveClient>? logger, HttpClient? httpClient = null)
         {
             DriveId = driveId;
-            Parallelism = parallelism;
+            Parallelism = options.Parallelism;
+            _uploadOptions = options;
             Logger = logger;
-            string version = Assembly.GetEntryAssembly()?.GetName().Version?.ToString() ?? "unknown";
             HttpClient = httpClient ?? new HttpClient { BaseAddress = new Uri("https://api.infomaniak.com") };
             HttpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
             HttpClient.DefaultRequestHeaders.UserAgent.ParseAdd("kDriveClient.NET/" + GetVersion());
-            this.Logger?.LogInformation("KDriveClient initialized with Drive ID: {DriveId}", DriveId);
+            Logger?.LogInformation("KDriveClient initialized with Drive ID: {DriveId}", DriveId);
 
-            if (autoChunk)
+            Pipeline = new KDriveHttpPipeline(HttpClient, Logger);
+            var apiGateway = new HttpKDriveApiGateway((request, cancellationToken) => SendAsync(request, cancellationToken));
+            UploadService = new KDriveUploadService(DriveId, new KDriveHttpTransport(SendAsync, Logger), Logger);
+            EndpointsService = new KDriveEndpointsService(DriveId, apiGateway);
+
+            if (!options.UseAutoChunkSize)
             {
-                this.Logger?.LogInformation("Auto chunking enabled, initializing upload strategy...");
-                InitializeUploadStrategyAsync(chunkSize).GetAwaiter().GetResult();
-                this.Logger?.LogInformation("Upload strategy initialized with direct upload threshold: {Threshold} bytes and dynamic chunk size: {ChunkSize} bytes", DirectUploadThresholdBytes, DynamicChunkSizeBytes);
-            }
-            else if (chunkSize is null) // If autoChunk is disabled and no custom chunk size provided, use a default
-            {
-                DynamicChunkSizeBytes = 1024 * 1024; // Default to 1MB chunks
-                this.Logger?.LogInformation("Using default chunk size: {ChunkSize} bytes", DynamicChunkSizeBytes);
+                UploadService.InitializeAsync(options).GetAwaiter().GetResult();
+                ApplyUploadStrategyState();
+                _uploadInitialized = true;
             }
             else
             {
-                DynamicChunkSizeBytes = chunkSize.Value;
-                this.Logger?.LogInformation("Using custom chunk size: {ChunkSize} bytes", DynamicChunkSizeBytes);
+                // Defaults until CreateAsync / first upload probes bandwidth.
+                DirectUploadThresholdBytes = options.DirectUploadThresholdBytes > 0
+                    ? options.DirectUploadThresholdBytes
+                    : 1024L * 1024;
+                DynamicChunkSizeBytes = options.ChunkSize > 0 ? options.ChunkSize : 1024 * 1024;
             }
+        }
+
+        /// <summary>
+        /// Creates and fully initializes a client (including optional bandwidth probe).
+        /// Preferred over the sync constructor when <see cref="KDriveUploadOptions.UseAutoChunkSize"/> is true.
+        /// </summary>
+        public static async Task<KDriveClient> CreateAsync(
+            string token,
+            long driveId,
+            KDriveUploadOptions? options = null,
+            ILogger<KDriveClient>? logger = null,
+            HttpClient? httpClient = null,
+            CancellationToken ct = default)
+        {
+            options ??= new KDriveUploadOptions();
+            var client = new KDriveClient(token, driveId, options, logger, httpClient);
+            await client.EnsureUploadInitializedAsync(ct).ConfigureAwait(false);
+            return client;
+        }
+
+        /// <summary>
+        /// Rebinds the client to another drive id (endpoints + upload). Thread-safe.
+        /// Prefer calling after <see cref="BootstrapAsync"/> when the selected drive differs from construction.
+        /// </summary>
+        public void RebindDriveId(long driveId)
+        {
+            if (driveId <= 0)
+                throw new ArgumentOutOfRangeException(nameof(driveId));
+
+            DriveId = driveId;
+            if (EndpointsService is KDriveEndpointsService endpoints)
+                endpoints.SetDriveId(driveId);
+            if (UploadService is KDriveUploadService upload)
+                upload.SetDriveId(driveId);
+            Logger?.LogInformation("KDriveClient rebound to Drive ID: {DriveId}", driveId);
         }
 
         /// <summary>
         /// Uploads a file to kDrive, automatically determining the upload strategy based on file size.
         /// </summary>
-        /// <param name="file"><see cref="KDriveFile"/> to upload</param>
-        /// <param name="ct">Cancellation token to cancel the operation.</param>
-        /// <returns><see cref="KDriveUploadResponse"/> of your uploaded file</returns>
         public async Task<KDriveUploadResponse> UploadAsync(KDriveFile file, CancellationToken ct = default)
         {
-            file.SplitIntoChunks(this.DynamicChunkSizeBytes);
-            if (file.TotalSize <= 1L * 1024 * 1024 || file.TotalSize <= DirectUploadThresholdBytes)
-            {
-                this.Logger?.LogInformation("File size {FileSize} bytes is below direct upload threshold {Threshold} bytes, uploading directly.", file.TotalSize, DirectUploadThresholdBytes);
-                return await UploadFileDirectAsync(file, ct);
-            }
-            else
-            {
-                this.Logger?.LogInformation("File size {FileSize} bytes exceeds direct upload threshold {Threshold} bytes, uploading in chunks.", file.TotalSize, DirectUploadThresholdBytes);
-                return await UploadFileChunkedAsync(file, ct);
-            }
+            await EnsureUploadInitializedAsync(ct).ConfigureAwait(false);
+            UploadService.Progress = Progress;
+            return await UploadService.UploadAsync(file, ct).ConfigureAwait(false);
         }
 
         /// <summary>
-        /// Sends an HTTP request to the kDrive API.
+        /// Sends an HTTP request through the shared pipeline.
         /// </summary>
-        /// <param name="request"><see cref="HttpRequestMessage"/> request</param>
-        /// <param name="ct">Cancellation token to cancel the operation.</param>
-        /// <returns><see cref="HttpResponseMessage"/></returns>
-        /// <exception cref="HttpRequestException"></exception>
-        protected virtual async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken ct = default)
+        protected virtual Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken ct = default)
         {
-            using var lease = await RateLimiter.AcquireAsync(1, ct);
-            if (!lease.IsAcquired)
-            {
-                if (lease.TryGetMetadata("RETRY_AFTER", out var obj) && obj is TimeSpan retryAfter)
-                {
-                    Logger?.LogInformation("Rate limit reached. Retry-After {RetryAfter}", retryAfter);
-                    await Task.Delay(retryAfter, ct);
-                }
-                else
-                {
-                    Logger?.LogWarning("Rate limit exceeded for request: {RequestMethod} {RequestUri}", request.Method, request.RequestUri);
-                    throw new HttpRequestException("Rate limit exceeded");
-                }
-            }
-
-            Logger?.LogInformation("Sending request: {RequestMethod} {RequestUri}", request.Method, request.RequestUri);
-            return await SendWithErrorHandlingAsync(request, ct);
+            return Pipeline.SendAsync(request, ct);
         }
 
-        /// <summary>
-        /// Sends an HTTP request and handles errors by deserializing the response.
-        /// </summary>
-        /// <param name="request"><see cref="HttpRequestMessage"/> request</param>
-        /// <param name="ct">Cancellation token to cancel the operation.</param>
-        /// <returns><see cref="HttpResponseMessage"/></returns>
-        private async Task<HttpResponseMessage> SendWithErrorHandlingAsync(HttpRequestMessage request, CancellationToken ct = default)
+        private async Task EnsureUploadInitializedAsync(CancellationToken ct)
         {
-            var response = await HttpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, ct);
+            if (_uploadInitialized)
+                return;
 
-            return await KDriveJsonHelper.DeserializeResponseAsync(response, ct);
+            await _initLock.WaitAsync(ct).ConfigureAwait(false);
+            try
+            {
+                if (_uploadInitialized)
+                    return;
+
+                await UploadService.InitializeAsync(_uploadOptions, ct).ConfigureAwait(false);
+                ApplyUploadStrategyState();
+                _uploadInitialized = true;
+                Logger?.LogInformation(
+                    "Upload strategy initialized with direct upload threshold: {Threshold} bytes and dynamic chunk size: {ChunkSize} bytes",
+                    DirectUploadThresholdBytes,
+                    DynamicChunkSizeBytes);
+            }
+            finally
+            {
+                _initLock.Release();
+            }
+        }
+
+        private void ApplyUploadStrategyState()
+        {
+            DirectUploadThresholdBytes = UploadService.DirectUploadThresholdBytes;
+            DynamicChunkSizeBytes = UploadService.ChunkSizeBytes;
+            Parallelism = _uploadOptions.Parallelism;
         }
 
         /// <summary>
         /// Gets the version of the assembly.
         /// </summary>
-        /// <returns>The verstion of the assembly</returns>
         [RequiresAssemblyFiles("Calls System.Reflection.Assembly.Location")]
         private static string GetVersion()
         {

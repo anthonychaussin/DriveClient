@@ -16,14 +16,36 @@ namespace kDriveClient.Helpers
         /// <exception cref="InvalidOperationException"></exception>
         public static KDriveUploadResponse DeserializeUploadResponse(string json)
         {
-            return JsonSerializer.Deserialize(json, KDriveJsonContext.Default.KDriveUploadResponseWraper)?.Data?.File ?? throw new InvalidOperationException("Failed to parse upload response");
+            // Variant 1: { result, data: { file: { ... } } }
+            var wrapper = JsonSerializer.Deserialize(json, KDriveJsonContext.Default.KDriveUploadResponseWrapper);
+            if (wrapper?.Data?.File is not null)
+            {
+                return wrapper.Data.File;
+            }
+
+            // Variant 2: { result, data: { ...upload response... } }
+            var resource = JsonSerializer.Deserialize(json, KDriveJsonContext.Default.KDriveResourceResponseKDriveUploadResponse);
+            if (resource?.Data is not null)
+            {
+                return resource.Data;
+            }
+
+            // Variant 3: { ...upload response... } (raw object)
+            var upload = JsonSerializer.Deserialize(json, KDriveJsonContext.Default.KDriveUploadResponse);
+            if (upload is not null && (upload.Id > 0 || !string.IsNullOrWhiteSpace(upload.Name)))
+            {
+                return upload;
+            }
+
+            var snippet = json.Length > 400 ? json[..400] + "..." : json;
+            throw new InvalidOperationException($"Failed to parse upload response. Payload: {snippet}");
         }
 
         /// <summary>
         /// Parses the start session response JSON to extract the token and upload URL.
         /// </summary>
         /// <param name="json">JSON string to deserialize</param>
-        /// <returns>BaseUrl and Toekn as a tuple</returns>
+        /// <returns>Token and upload URL as a tuple</returns>
         /// <exception cref="InvalidOperationException"></exception>
         public static (string Token, string UploadUrl) ParseStartSessionResponse(string json)
         {
@@ -52,24 +74,7 @@ namespace kDriveClient.Helpers
         /// <exception cref="KDriveApiException">Thrown when the response indicates an error.</exception>
         public static async Task<HttpResponseMessage> DeserializeResponseAsync(HttpResponseMessage response, CancellationToken ct)
         {
-            if (!response.IsSuccessStatusCode)
-            {
-                KDriveErrorResponse? error = null;
-                try
-                {
-                    await using var stream = await response.Content.ReadAsStreamAsync(ct);
-                    error = await JsonSerializer.DeserializeAsync(stream, KDriveJsonContext.Default.KDriveErrorResponse, cancellationToken: ct);
-                }
-                catch
-                {
-                    response.EnsureSuccessStatusCode();
-                }
-
-                if (error is not null)
-                {
-                    throw new KDriveApiException(error);
-                }
-            }
+            await KDriveErrorHandler.HandleApiErrorAsync(response, ct);
 
             return response;
         }

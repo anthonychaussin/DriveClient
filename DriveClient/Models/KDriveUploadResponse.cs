@@ -3,7 +3,7 @@
     /// <summary>
     /// KDrive upload response wrapper.
     /// </summary>
-    public class KDriveUploadResponseWraper : ApiResultBase
+    public class KDriveUploadResponseWrapper : ApiResultBase
     {
         /// <summary>
         /// Result of the upload operation. ("success" or "error")
@@ -14,6 +14,11 @@
         /// Data containing the details of the uploaded file.
         /// </summary>
         public KDriveUploadDataResponse? Data { get; set; }
+
+        public override string ToString()
+        {
+            return $"Result={Result}, HasData={Data is not null}, ExtraDataCount={ExtraDataCount}";
+        }
     }
 
     /// <summary>
@@ -40,6 +45,11 @@
         /// Additional message regarding the upload operation.
         /// </summary>
         public string? Message { get; set; }
+
+        public override string ToString()
+        {
+            return $"Result={Result}, Token={Token}, Message={Message}, File={File?.Name ?? "<null>"}, ExtraDataCount={ExtraDataCount}";
+        }
     }
 
     /// <summary>
@@ -95,17 +105,17 @@
         /// <summary>
         /// File or folder type.
         /// </summary>
-        public required string Type { get; set; }
+        public string Type { get; set; }
 
         /// <summary>
         /// Current status of the file.
         /// </summary>
-        public required string Status { get; set; }
+        public string Status { get; set; }
 
         /// <summary>
         /// Visibility of the file.
         /// </summary>
-        public required string Visibility { get; set; }
+        public string Visibility { get; set; }
 
         /// <summary>
         /// Drive ID associated with the file.
@@ -166,5 +176,10 @@
         /// Antivirus scan status of the file.
         /// </summary>
         public string? Scan_status { get; set; }
+
+        public override string ToString()
+        {
+            return $"Id={Id}, Name={Name}, Path={Path}, DirectoryId={DirectoryId}, ParentId={Parent_id}, Size={Size}, Type={Type}, Status={Status}, Visibility={Visibility}, MimeType={Mime_Type}, Hash={Hash}, ScanStatus={Scan_status}, ExtraDataCount={ExtraDataCount}";
+        }
     }
 }
