@@ -1,5 +1,3 @@
----
-
 ## kDriveClient SDK
 
 ![NuGet](https://img.shields.io/nuget/v/kDriveClient.svg)
