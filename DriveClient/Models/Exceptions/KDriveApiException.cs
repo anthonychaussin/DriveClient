@@ -10,5 +10,10 @@
         /// Error contains the details of the error returned by the kDrive API.
         /// </summary>
         public KDriveErrorResponse Error { get; } = error;
+
+        public override string ToString()
+        {
+            return $"{base.ToString()}, ApiError=({Error})";
+        }
     }
 }

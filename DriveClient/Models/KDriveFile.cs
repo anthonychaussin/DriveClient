@@ -1,19 +1,25 @@
-﻿using System.Buffers;
 using System.Text;
 
 namespace kDriveClient.Models
 {
     /// <summary>
-    /// KDriveFile represents a file in the kDrive system.
+    /// Local upload payload: the file content and metadata to upload to kDrive.
     /// </summary>
+    /// <remarks>
+    /// This is <b>not</b> a remote file-system resource. After a successful upload, use the
+    /// returned <see cref="KDriveUploadResponse"/> (and/or fetch a
+    /// <see cref="Domain.KDriveRemoteFile"/> via browse/get APIs).
+    /// For remote files and directories already stored on the drive, see
+    /// <see cref="Domain.KDriveItem"/>, <see cref="Domain.KDriveRemoteFile"/>, and
+    /// <see cref="Domain.KDriveDirectory"/>.
+    /// </remarks>
+    /// <seealso cref="Domain.KDriveRemoteFile"/>
     public class KDriveFile : IDisposable
     {
-        private Int64 totalSize;
-
         /// <summary>
         /// CreatedAt is the timestamp when the file was created.
         /// </summary>
-        public int CreatedAt { get; set; }
+        public long CreatedAt { get; set; }
 
         /// <summary>
         /// DirectoryId is the unique identifier for the directory containing this file.
@@ -33,7 +39,7 @@ namespace kDriveClient.Models
         /// <summary>
         /// LastModifiedAt is the timestamp when the file was last modified.
         /// </summary>
-        public int LastModifiedAt { get; set; }
+        public long LastModifiedAt { get; set; }
 
         /// <summary>
         /// In case of a symbolic link, this is the target of the link.
@@ -46,70 +52,57 @@ namespace kDriveClient.Models
         public string TotalChunkHash { get; set; } = string.Empty;
 
         /// <summary>
-        /// TotalSize is the total size of the file in bytes, calculated as the sum of all chunk sizes.
+        /// TotalSize is the total size of the file in bytes.
         /// </summary>
-        public long TotalSize
-        {
-            get
-            {
-                if (totalSize == 0)
-                {
-                    totalSize = this.Chunks.Sum(c => (long)c.ChunkSize);
-                }
-                return totalSize;
-            }
-        }
+        public long TotalSize { get; set; }
 
         /// <summary>
-        /// Chunks is a list of KDriveChunk objects representing the file's content split into chunks.
-        /// </summary>
-        public List<KDriveChunk> Chunks { get; set; } = [];
-
-        /// <summary>
-        /// Content is a stream representing the file's content.
-        /// </summary>
-        public Stream? Content { get; init; }
-
-        /// <summary>
-        /// In case of conflict with an existing file, it define how to manage the conflict
+        /// In case of conflict with an existing file, it defines how to manage the conflict.
         /// </summary>
         public ConflictChoice ConflictChoice { get; set; } = ConflictChoice.Version;
 
         /// <summary>
-        /// Splits the file content into chunks of the specified size.
+        /// LocalPath is the local file system path to the file.
         /// </summary>
-        /// <param name="chunkSize">Define the size of each chunk (except the last one)</param>
-        public void SplitIntoChunks(int chunkSize)
+        public string LocalPath { get; set; } = string.Empty;
+
+        /// <summary>
+        /// Optional in-memory content stream.
+        /// </summary>
+        public Stream? Content { get; set; }
+
+        /// <summary>
+        /// File chunks used for chunked upload.
+        /// </summary>
+        public List<KDriveChunk> Chunks { get; set; } = [];
+
+        /// <summary>
+        /// Constructs an empty file model.
+        /// </summary>
+        public KDriveFile()
         {
-            if (this.Content == null)
-            {
-                throw new InvalidOperationException("Content stream is null.");
-            }
+        }
 
-            var pool = ArrayPool<byte>.Shared;
-            var buffer = pool.Rent(chunkSize);
-            int chunkNumber = 0;
-            int bytesRead;
+        /// <summary>
+        /// Constructs a KDriveFile instance from a local file path and drive path.
+        /// </summary>
+        /// <param name="localPath">Local file system path to the file.</param>
+        /// <param name="drivePath">Drive path where the file will be uploaded.</param>
+        /// <param name="conflictChoice">Conflict resolution strategy.</param>
+        /// <exception cref="ArgumentException">Argument is null or whitespace.</exception>
+        public KDriveFile(string localPath, string drivePath, ConflictChoice conflictChoice = ConflictChoice.Rename)
+        {
+            if (string.IsNullOrWhiteSpace(localPath))
+                throw new ArgumentException("Value cannot be null or whitespace.", nameof(localPath));
 
-            this.Content.Position = 0;
-            using var fileSha256 = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
-            while ((bytesRead = this.Content.Read(buffer, 0, chunkSize)) > 0)
-            {
-                var chunkData = new byte[bytesRead];
-                Array.Copy(buffer, chunkData, bytesRead);
-                var chunkHash = SHA256.HashData(chunkData);
-                this.Chunks.Add(new KDriveChunk(chunkData, chunkNumber++, chunkHash));
-                fileSha256.AppendData(Encoding.UTF8.GetBytes(Convert.ToHexString(chunkHash).ToLowerInvariant()));
-            }
-
-            pool.Return(buffer);
-
-            this.Content.Dispose();
-            GC.Collect();
-
-            this.TotalChunkHash = this.Chunks.Count > 1 ?
-                this.TotalChunkHash = Convert.ToHexString(fileSha256.GetHashAndReset())
-                : this.Chunks.First().ChunkHash;
+            var fileInfo = new FileInfo(localPath);
+            Name = fileInfo.Name;
+            LocalPath = localPath;
+            DirectoryPath = drivePath;
+            TotalSize = fileInfo.Length;
+            ConflictChoice = conflictChoice;
+            LastModifiedAt = new DateTimeOffset(fileInfo.LastWriteTimeUtc).ToUnixTimeSeconds();
+            CreatedAt = new DateTimeOffset(fileInfo.CreationTimeUtc).ToUnixTimeSeconds();
         }
 
         /// <summary>
@@ -122,12 +115,12 @@ namespace kDriveClient.Models
         }
 
         /// <summary>
-        /// Convert enum to string for api
+        /// Convert enum to string for API.
         /// </summary>
-        /// <returns>String representation of </returns>
+        /// <returns>String representation of the conflict mode.</returns>
         public string ConvertConflictChoice()
         {
-            return this.ConflictChoice switch
+            return ConflictChoice switch
             {
                 ConflictChoice.Version => "version",
                 ConflictChoice.Error => "error",
@@ -137,13 +130,100 @@ namespace kDriveClient.Models
         }
 
         /// <summary>
+        /// Hash algorithm used when splitting into chunks.
+        /// </summary>
+        public KDriveUploadHashAlgorithm HashAlgorithm { get; set; } = KDriveUploadHashAlgorithm.Sha256;
+
+        /// <summary>
+        /// Split file content into chunks and compute chunk hashes.
+        /// </summary>
+        /// <param name="chunkSize">Target chunk size in bytes.</param>
+        public void SplitIntoChunks(int chunkSize)
+            => SplitIntoChunks(chunkSize, HashAlgorithm);
+
+        /// <summary>
+        /// Split file content into chunks and compute chunk hashes.
+        /// </summary>
+        public void SplitIntoChunks(int chunkSize, KDriveUploadHashAlgorithm algorithm)
+        {
+            if (chunkSize <= 0)
+                throw new ArgumentOutOfRangeException(nameof(chunkSize), "Chunk size must be greater than zero.");
+
+            HashAlgorithm = algorithm;
+            Chunks.Clear();
+            using var source = OpenReadableStream();
+            var buffer = new byte[chunkSize];
+            var index = 0;
+            int bytesRead;
+            var chunkHashes = new List<string>();
+
+            while ((bytesRead = source.Read(buffer, 0, buffer.Length)) > 0)
+            {
+                var chunkData = bytesRead == buffer.Length ? [.. buffer] : buffer[..bytesRead];
+                var chunkHash = KDriveChunk.GetChunkHash(chunkData, algorithm);
+                chunkHashes.Add(chunkHash);
+                Chunks.Add(new KDriveChunk(chunkData, index++, chunkHash, algorithm));
+            }
+
+            TotalSize = source.Length;
+            TotalChunkHash = KDriveChunk.ComputeTotalChunkHash(chunkHashes, algorithm);
+        }
+
+        /// <summary>
+        /// Create an in-memory virtual file.
+        /// </summary>
+        internal static KDriveFile CreateVirtualFile(string name, Memory<byte> buffer, string drivePath)
+        {
+            var now = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+            return new KDriveFile
+            {
+                Name = name,
+                DirectoryPath = drivePath,
+                Content = new MemoryStream(buffer.ToArray(), writable: false),
+                TotalSize = buffer.Length,
+                CreatedAt = now,
+                LastModifiedAt = now,
+                LocalPath = string.Empty
+            };
+        }
+
+        /// <summary>
         /// Frees resources used by the KDriveFile instance.
         /// </summary>
         public void Dispose()
         {
-            this.Chunks.ForEach(c => c.Dispose());
-
+            Content?.Dispose();
+            foreach (var chunk in Chunks)
+            {
+                chunk.Dispose();
+            }
             GC.SuppressFinalize(this);
+        }
+
+        private Stream OpenReadableStream()
+        {
+            if (!string.IsNullOrWhiteSpace(LocalPath))
+            {
+                return new FileStream(LocalPath, FileMode.Open, FileAccess.Read, FileShare.Read);
+            }
+
+            if (Content is null)
+            {
+                throw new InvalidOperationException("Either LocalPath or Content must be provided.");
+            }
+
+            if (Content.CanSeek)
+            {
+                Content.Position = 0;
+            }
+
+            return Content;
+        }
+
+        public override string ToString()
+        {
+            var source = !string.IsNullOrWhiteSpace(LocalPath) ? "LocalPath" : (Content is not null ? "Content" : "None");
+            return $"Name={Name}, DirectoryId={DirectoryId}, DirectoryPath={DirectoryPath}, TotalSize={TotalSize}, Chunks={Chunks.Count}, Conflict={ConflictChoice}, Source={source}, LastModifiedAt={LastModifiedAt}, CreatedAt={CreatedAt}";
         }
     }
 }

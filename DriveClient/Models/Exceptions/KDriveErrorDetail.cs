@@ -21,7 +21,7 @@
         /// <returns></returns>
         public override string ToString()
         {
-            return $"Code: {Code}, Description: {Description}";
+            return $"Code={Code}, Description={Description}, ExtraDataCount={ExtraDataCount}";
         }
     }
 }

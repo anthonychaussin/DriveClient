@@ -10,5 +10,10 @@
         /// </summary>
         [JsonExtensionData]
         public Dictionary<string, JsonElement>? ExtraData { get; set; }
+
+        /// <summary>
+        /// Number of extension fields returned by the API.
+        /// </summary>
+        protected int ExtraDataCount => ExtraData?.Count ?? 0;
     }
 }
