@@ -24,16 +24,21 @@ jobs:
           dotnet-version: '10.0.x'
 
       - name: 📦 Restore dependencies
-        run: dotnet restore
+        run: dotnet restore DriveClient/kDriveClient.csproj
 
       - name: 🛠️ Build
-        run: dotnet build --configuration Release --no-restore
+        run: dotnet build DriveClient/kDriveClient.csproj --configuration Release --no-restore
 
       - name: 🧪 Run tests
-        run: dotnet test --no-build --configuration Release
+        run: dotnet test DriveClientTests/kDriveClientTests.csproj --configuration Release
 
       - name: 📦 Pack NuGet
-        run: dotnet pack --configuration Release --no-build --output ./nupkgs
+        run: >
+          dotnet pack DriveClient/kDriveClient.csproj
+          --configuration Release
+          --no-build
+          --output ./nupkgs
+          -p:IncludeSymbols=false
 
       - name: 🔑 NuGet login (OIDC → temporary API key)
         id: nuget_login
@@ -43,8 +48,18 @@ jobs:
           user: AnthonyChaussin
 
       - name: 🚀 Publish to NuGet
-        run: >
-          dotnet nuget push "./nupkgs/*.nupkg"
-          --api-key ${{ steps.nuget_login.outputs.NUGET_API_KEY }}
-          --source https://api.nuget.org/v3/index.json
-          --skip-duplicate
+        run: |
+          set -euo pipefail
+          mapfile -t pkgs < <(find ./nupkgs -maxdepth 1 -type f -name 'kDriveClient.*.nupkg' ! -name '*.symbols.nupkg')
+          if [ "${#pkgs[@]}" -eq 0 ]; then
+            echo "No kDriveClient package found in ./nupkgs" >&2
+            ls -la ./nupkgs >&2 || true
+            exit 1
+          fi
+          for pkg in "${pkgs[@]}"; do
+            echo "Publishing $pkg"
+            dotnet nuget push "$pkg" \
+              --api-key "${{ steps.nuget_login.outputs.NUGET_API_KEY }}" \
+              --source https://api.nuget.org/v3/index.json \
+              --skip-duplicate
+          done
