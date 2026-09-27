@@ -14,5 +14,10 @@
         /// Data contains the actual response data, which can vary based on the API endpoint.
         /// </summary>
         public Dictionary<string, object> Data { get; set; } = [];
+
+        public override string ToString()
+        {
+            return $"Result={Result}, DataCount={Data.Count}, ExtraDataCount={ExtraDataCount}";
+        }
     }
 }

@@ -10,5 +10,10 @@ namespace kDriveClient.Models
         /// </summary>
         [JsonPropertyName("total_chunk_hash")]
         public string TotalChunkHash { get; set; } = string.Empty;
+
+        public override string ToString()
+        {
+            return $"TotalChunkHash={TotalChunkHash}";
+        }
     }
 }
