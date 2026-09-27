@@ -18,7 +18,12 @@ namespace kDriveClient.Extensions
         public long DriveId { get; set; }
 
         /// <summary>
-        /// API base address (defaults to Infomaniak).
+        /// Optional Infomaniak account id (useful for <c>BootstrapAsync</c> / multi-drive flows).
+        /// </summary>
+        public long? AccountId { get; set; }
+
+        /// <summary>
+        /// API base address (must be absolute; defaults to Infomaniak).
         /// </summary>
         public Uri BaseAddress { get; set; } = new("https://api.infomaniak.com");
 
@@ -29,6 +34,7 @@ namespace kDriveClient.Extensions
 
         /// <summary>
         /// Named <see cref="HttpClient"/> registration name.
+        /// When using a custom name, ensure that named client is registered (default registration uses <c>kDrive</c>).
         /// </summary>
         public string HttpClientName { get; set; } = "kDrive";
     }

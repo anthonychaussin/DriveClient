@@ -18,9 +18,10 @@ namespace kDriveClient.kDriveClient.Application.Upload
         private const long MaxChunkBytes = 1L * 1024 * 1024 * 1024;
         private const double Safety = 1.10;
 
-        private readonly long _driveId;
+        private long _driveId;
         private readonly IKDriveTransport _transport;
         private readonly ILogger? _logger;
+        private readonly object _driveIdLock = new();
         private UploadStrategy _strategy = new(DefaultChunkSizeBytes, 1L * 1024 * 1024);
         private int _parallelism = 4;
         private KDriveUploadHashAlgorithm _hashAlgorithm = KDriveUploadHashAlgorithm.Sha256;
@@ -30,6 +31,15 @@ namespace kDriveClient.kDriveClient.Application.Upload
             _driveId = driveId;
             _transport = transport;
             _logger = logger;
+        }
+
+        /// <summary>Updates the drive id used for subsequent uploads (thread-safe).</summary>
+        public void SetDriveId(long driveId)
+        {
+            if (driveId <= 0)
+                throw new ArgumentOutOfRangeException(nameof(driveId));
+            lock (_driveIdLock)
+                _driveId = driveId;
         }
 
         public int ChunkSizeBytes => _strategy.ChunkSizeBytes;
@@ -91,11 +101,9 @@ namespace kDriveClient.kDriveClient.Application.Upload
             var (sessionToken, uploadUrl) = await StartSessionAsync(file, ct).ConfigureAwait(false);
 
             // Hash order must follow chunk index, independent of upload completion order.
-            using var totalHasher = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
-            foreach (var chunk in file.Chunks.OrderBy(c => c.ChunkNumber))
-                totalHasher.AppendData(Encoding.UTF8.GetBytes(chunk.ChunkHash));
-
-            var totalHashHex = Convert.ToHexString(totalHasher.GetHashAndReset()).ToLowerInvariant();
+            var totalHashHex = KDriveChunk.ComputeTotalChunkHash(
+                file.Chunks.OrderBy(c => c.ChunkNumber).Select(c => c.ChunkHash),
+                algorithm);
 
             using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
             var uploadCt = linkedCts.Token;

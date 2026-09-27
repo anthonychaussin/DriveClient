@@ -127,8 +127,7 @@ namespace kDriveClient.kDriveClient
         /// <inheritdoc />
         public async Task<KDriveUploadResponse> CloseSessionAsync(long driveId, string sessionId, string totalHashHex, CancellationToken ct, KDriveUploadHashAlgorithm algorithm = KDriveUploadHashAlgorithm.Sha256)
         {
-            var prefix = KDriveChunk.ToApiPrefix(algorithm);
-            using var content = new StringContent(JsonSerializer.Serialize(new { total_chunk_hash = $"{prefix}:{totalHashHex.ToLowerInvariant()}" }, KDriveJsonContext.Default.Object));
+            using var content = new StringContent(JsonSerializer.Serialize(new { total_chunk_hash = KDriveChunk.ToApiHash(algorithm, totalHashHex) }, KDriveJsonContext.Default.Object));
             using var req = new HttpRequestMessage(HttpMethod.Post, $"/3/drive/{driveId}/upload/session/{sessionId}/finish") { Content = content };
             using var response = await _send(req, ct).ConfigureAwait(false);
             try
@@ -176,7 +175,7 @@ namespace kDriveClient.kDriveClient
             if (includeChunkMetadata)
             {
                 AddOptionalNumericParam(list, "total_chunks", file.Chunks.Count);
-                AddOptionalChunkHash(list, file.TotalChunkHash);
+                AddOptionalChunkHash(list, file.TotalChunkHash, file.HashAlgorithm);
             }
 
             return list;
@@ -204,10 +203,10 @@ namespace kDriveClient.kDriveClient
                 list.Add(key, value);
         }
 
-        private static void AddOptionalChunkHash(Dictionary<string, object> list, string? hash)
+        private static void AddOptionalChunkHash(Dictionary<string, object> list, string? hash, KDriveUploadHashAlgorithm algorithm)
         {
             if (!string.IsNullOrWhiteSpace(hash))
-                list.Add("total_chunk_hash", $"sha256:{hash.ToLowerInvariant()}");
+                list.Add("total_chunk_hash", KDriveChunk.ToApiHash(algorithm, hash));
         }
     }
 }

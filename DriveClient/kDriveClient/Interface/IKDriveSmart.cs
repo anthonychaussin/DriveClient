@@ -103,6 +103,7 @@ namespace kDriveClient.kDriveClient
 
         /// <summary>
         /// Discovers accessible drives for an account and optionally picks one (first non-maintenance, or matching <paramref name="preferredDriveId"/>).
+        /// When the selected drive differs from the current <see cref="KDriveClient.DriveId"/>, the client is rebound via <see cref="KDriveClient.RebindDriveId"/>.
         /// </summary>
         Task<KDriveBootstrapContext> BootstrapAsync(long accountId, long? preferredDriveId = null, CancellationToken ct = default);
 
@@ -121,6 +122,46 @@ namespace kDriveClient.kDriveClient
         /// Enumerates search results page by page via v3 cursor pagination.
         /// </summary>
         IAsyncEnumerable<KDriveItem> EnumerateSearchAsync(KDriveSearchQuery query, int pageSize = 200, CancellationToken ct = default);
+
+        /// <summary>Enumerates favorite items via v3 cursor pagination.</summary>
+        IAsyncEnumerable<KDriveItem> EnumerateFavoritesAsync(KDriveListQuery? query = null, int pageSize = 200, CancellationToken ct = default);
+
+        /// <summary>Enumerates trash items via v3 cursor pagination.</summary>
+        IAsyncEnumerable<KDriveItem> EnumerateTrashAsync(KDriveListQuery? query = null, int pageSize = 200, CancellationToken ct = default);
+
+        /// <summary>Enumerates shared-with-me items via v3 cursor pagination.</summary>
+        IAsyncEnumerable<KDriveItem> EnumerateSharedAsync(KDriveListQuery? query = null, int pageSize = 200, CancellationToken ct = default);
+
+        /// <summary>
+        /// Builds a ZIP archive for the given files (or directory) and downloads it when ready.
+        /// </summary>
+        Task<Stream> BuildAndDownloadArchiveAsync(
+            IEnumerable<long> fileIds,
+            long? parentId = null,
+            IEnumerable<long>? exceptFileIds = null,
+            TimeSpan? timeout = null,
+            TimeSpan? interval = null,
+            CancellationToken ct = default);
+
+        /// <summary>
+        /// Polls an external import job until status is <c>done</c>, <c>failed</c>, or <c>canceled</c>.
+        /// </summary>
+        Task<KDriveExternalImport> WaitForImportCompleteAsync(
+            long importId,
+            TimeSpan? timeout = null,
+            TimeSpan? interval = null,
+            CancellationToken ct = default);
+
+        /// <summary>
+        /// Copies a file from another drive into <paramref name="destinationDirectoryId"/> and waits for the import job.
+        /// </summary>
+        Task<KDriveExternalImport> CopyBetweenDrivesAsync(
+            long destinationDirectoryId,
+            long sourceDriveId,
+            long sourceFileId,
+            TimeSpan? timeout = null,
+            TimeSpan? interval = null,
+            CancellationToken ct = default);
 
         /// <summary>
         /// Polls until <paramref name="isPending"/> returns false (or timeout).

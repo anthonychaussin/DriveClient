@@ -115,7 +115,120 @@ namespace kDriveClientTests.kDriveClient
 
             var ctx = await client.BootstrapAsync(99, preferredDriveId: 111);
             Assert.AreEqual(111L, ctx.DriveId);
+            Assert.AreEqual(111L, client.DriveId);
             Assert.AreEqual(2, ctx.Drives.Count);
+        }
+
+        [TestMethod]
+        public async Task BootstrapAsync_ShouldRebindDriveId()
+        {
+            var json = """
+            {"result":"success","data":[{"id":222,"name":"Other"}],"page":1,"pages":1}
+            """;
+            var handler = new RecordingHandler(Ok(json));
+            var client = CreateClient(handler);
+            Assert.AreEqual(111L, client.DriveId);
+
+            var ctx = await client.BootstrapAsync(99);
+            Assert.AreEqual(222L, ctx.DriveId);
+            Assert.AreEqual(222L, client.DriveId);
+        }
+
+        [TestMethod]
+        public async Task EnvelopeErrorOnHttp200_ShouldThrow()
+        {
+            var json = """{"result":"error","error":{"code":"conflict_error","description":"nope"}}""";
+            var handler = new RecordingHandler(Ok(json));
+            var client = CreateClient(handler);
+
+            var ex = await Assert.ThrowsAsync<KDriveApiException>(() => client.GetItemAsync(1));
+            Assert.AreEqual("conflict_error", ex.Error.Error.Code);
+        }
+
+        [TestMethod]
+        public async Task NonJsonHttpError_ShouldStillThrow()
+        {
+            var handler = new RecordingHandler(new HttpResponseMessage(HttpStatusCode.BadGateway)
+            {
+                Content = new StringContent("bad gateway", Encoding.UTF8, "text/plain"),
+                ReasonPhrase = "Bad Gateway"
+            });
+            var client = CreateClient(handler);
+
+            var ex = await Assert.ThrowsAsync<KDriveApiException>(() => client.DownloadFileAsync(1));
+            Assert.AreEqual("http_502", ex.Error.Error.Code);
+        }
+
+        [TestMethod]
+        public async Task DownloadFileAsync_ShouldReportProgressAndVerifyHash()
+        {
+            var payload = Encoding.UTF8.GetBytes("hello-hash");
+            var expected = Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(payload)).ToLowerInvariant();
+            var handler = new RecordingHandler(new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new ByteArrayContent(payload)
+            });
+            var client = CreateClient(handler);
+            long reported = 0;
+
+            await using var stream = await client.DownloadFileAsync(42, new KDriveDownloadOptions
+            {
+                Progress = new Progress<long>(n => reported = n),
+                ExpectedHash = expected
+            });
+
+            using var ms = new MemoryStream();
+            await stream.CopyToAsync(ms);
+            Assert.AreEqual(payload.Length, ms.Length);
+            await Task.Delay(30);
+            Assert.AreEqual(payload.Length, reported);
+        }
+
+        [TestMethod]
+        public async Task WaitForImportCompleteAsync_ShouldStopOnDone()
+        {
+            var queued = Ok("""{"result":"success","data":{"id":9,"status":"in_progress"}}""");
+            var done = Ok("""{"result":"success","data":{"id":9,"status":"done"}}""");
+            var handler = new SequenceHandler(queued, done);
+            var client = CreateClient(handler);
+
+            var job = await client.WaitForImportCompleteAsync(9, timeout: TimeSpan.FromSeconds(5), interval: TimeSpan.FromMilliseconds(1));
+            Assert.AreEqual("done", job.Status);
+            Assert.AreEqual(2, handler.Requests.Count);
+        }
+
+        [TestMethod]
+        public async Task BuildAndDownloadArchiveAsync_ShouldRetryUntilZipReady()
+        {
+            var build = Ok("""{"result":"success","data":{"uuid":"arch-1"}}""");
+            var notReady = new HttpResponseMessage(HttpStatusCode.Conflict)
+            {
+                Content = new StringContent("""{"result":"error","error":{"code":"not_ready","description":"wait"}}""", Encoding.UTF8, "application/json")
+            };
+            var zip = new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new ByteArrayContent(Encoding.UTF8.GetBytes("PKZIP"))
+            };
+            var wake = Ok("""{"result":"success","data":true}""");
+            var handler = new SequenceHandler(wake, build, notReady, zip);
+            var client = CreateClient(handler);
+
+            await using var stream = await client.BuildAndDownloadArchiveAsync(
+                [1, 2],
+                timeout: TimeSpan.FromSeconds(5),
+                interval: TimeSpan.FromMilliseconds(1));
+            using var ms = new MemoryStream();
+            await stream.CopyToAsync(ms);
+            Assert.AreEqual("PKZIP", Encoding.UTF8.GetString(ms.ToArray()));
+        }
+
+        [TestMethod]
+        public void FormatIncludes_ShouldEmitExtendedWithValues()
+        {
+            var with = KDriveEnumFormatting.FormatIncludes(
+                KDriveItemIncludes.Hash | KDriveItemIncludes.Etag | KDriveItemIncludes.Activity | KDriveItemIncludes.Lock);
+            Assert.IsNotNull(with);
+            CollectionAssert.AreEquivalent(new[] { "hash", "etag", "activity", "lock" }, with!.Split(','));
         }
 
         [TestMethod]
@@ -181,9 +294,11 @@ namespace kDriveClientTests.kDriveClient
         private sealed class SequenceHandler(params HttpResponseMessage[] responses) : HttpMessageHandler
         {
             private int _i;
+            public List<HttpRequestMessage> Requests { get; } = [];
 
             protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
             {
+                Requests.Add(request);
                 var response = responses[Math.Min(_i, responses.Length - 1)];
                 _i++;
                 return Task.FromResult(response);

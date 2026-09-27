@@ -7,13 +7,23 @@ namespace kDriveClient.kDriveClient.Application.Endpoints
 {
     public sealed partial class KDriveEndpointsService : IKDriveEndpointsService
     {
-        private readonly long _driveId;
+        private long _driveId;
         private readonly IKDriveApiGateway _api;
+        private readonly object _driveIdLock = new();
 
         public KDriveEndpointsService(long driveId, IKDriveApiGateway api)
         {
             _driveId = driveId;
             _api = api;
+        }
+
+        /// <summary>Updates the drive id used for subsequent endpoint calls (thread-safe).</summary>
+        public void SetDriveId(long driveId)
+        {
+            if (driveId <= 0)
+                throw new ArgumentOutOfRangeException(nameof(driveId));
+            lock (_driveIdLock)
+                _driveId = driveId;
         }
 
 

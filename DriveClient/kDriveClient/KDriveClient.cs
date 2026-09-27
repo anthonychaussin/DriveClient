@@ -18,7 +18,10 @@ namespace kDriveClient.kDriveClient
     {
         private ILogger<KDriveClient>? Logger { get; set; }
 
-        private Int64 DriveId { get; set; }
+        /// <summary>
+        /// Current drive id used for API calls. Updated by <see cref="RebindDriveId"/> / <see cref="BootstrapAsync"/>.
+        /// </summary>
+        public long DriveId { get; private set; }
 
         private HttpClient HttpClient { get; set; }
 
@@ -140,6 +143,23 @@ namespace kDriveClient.kDriveClient
             var client = new KDriveClient(token, driveId, options, logger, httpClient);
             await client.EnsureUploadInitializedAsync(ct).ConfigureAwait(false);
             return client;
+        }
+
+        /// <summary>
+        /// Rebinds the client to another drive id (endpoints + upload). Thread-safe.
+        /// Prefer calling after <see cref="BootstrapAsync"/> when the selected drive differs from construction.
+        /// </summary>
+        public void RebindDriveId(long driveId)
+        {
+            if (driveId <= 0)
+                throw new ArgumentOutOfRangeException(nameof(driveId));
+
+            DriveId = driveId;
+            if (EndpointsService is KDriveEndpointsService endpoints)
+                endpoints.SetDriveId(driveId);
+            if (UploadService is KDriveUploadService upload)
+                upload.SetDriveId(driveId);
+            Logger?.LogInformation("KDriveClient rebound to Drive ID: {DriveId}", driveId);
         }
 
         /// <summary>

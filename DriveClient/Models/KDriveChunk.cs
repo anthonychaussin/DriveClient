@@ -1,4 +1,5 @@
 ﻿using System.IO.Hashing;
+using System.Text;
 
 namespace kDriveClient.Models
 {
@@ -65,11 +66,33 @@ namespace kDriveClient.Models
         /// <summary>Gets the SHA-256 hash of the given content.</summary>
         public static string GetChunkHash(byte[] content) => GetChunkHash(content, KDriveUploadHashAlgorithm.Sha256);
 
+        /// <summary>
+        /// Computes the total upload hash as the digest of concatenated chunk digests (API contract).
+        /// </summary>
+        public static string ComputeTotalChunkHash(IEnumerable<string> orderedChunkHashes, KDriveUploadHashAlgorithm algorithm)
+        {
+            ArgumentNullException.ThrowIfNull(orderedChunkHashes);
+            using var ms = new MemoryStream();
+            foreach (var hash in orderedChunkHashes)
+            {
+                var bytes = Encoding.UTF8.GetBytes(hash);
+                ms.Write(bytes, 0, bytes.Length);
+            }
+
+            var payload = ms.ToArray();
+            return GetChunkHash(payload, algorithm);
+        }
+
         public static string ToApiPrefix(KDriveUploadHashAlgorithm algorithm) => algorithm switch
         {
             KDriveUploadHashAlgorithm.XxHash3 => "xxh3",
             _ => "sha256"
         };
+
+        /// <summary>API form <c>algo:hex</c> for a total chunk hash.</summary>
+        public static string ToApiHash(KDriveUploadHashAlgorithm algorithm, string hexDigest)
+            => $"{ToApiPrefix(algorithm)}:{hexDigest.ToLowerInvariant()}";
+
 
         public override string ToString()
         {

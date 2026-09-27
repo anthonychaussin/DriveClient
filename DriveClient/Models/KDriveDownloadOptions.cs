@@ -24,5 +24,15 @@ namespace kDriveClient.Models
         /// Temporary URL lifetime in seconds (60–86400). Used when <see cref="UseTemporaryUrl"/> is true.
         /// </summary>
         public int? TemporaryUrlDurationSeconds { get; set; }
+
+        /// <summary>
+        /// Optional progress reporter (bytes received so far).
+        /// </summary>
+        public IProgress<long>? Progress { get; set; }
+
+        /// <summary>
+        /// Optional expected content hash (hex or <c>algo:hex</c>). Verified as SHA-256 of the downloaded bytes.
+        /// </summary>
+        public string? ExpectedHash { get; set; }
     }
 }

@@ -155,18 +155,18 @@ namespace kDriveClient.Models
             var buffer = new byte[chunkSize];
             var index = 0;
             int bytesRead;
-            using var totalHasher = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
+            var chunkHashes = new List<string>();
 
             while ((bytesRead = source.Read(buffer, 0, buffer.Length)) > 0)
             {
                 var chunkData = bytesRead == buffer.Length ? [.. buffer] : buffer[..bytesRead];
                 var chunkHash = KDriveChunk.GetChunkHash(chunkData, algorithm);
-                totalHasher.AppendData(Encoding.UTF8.GetBytes(chunkHash));
+                chunkHashes.Add(chunkHash);
                 Chunks.Add(new KDriveChunk(chunkData, index++, chunkHash, algorithm));
             }
 
             TotalSize = source.Length;
-            TotalChunkHash = Convert.ToHexString(totalHasher.GetHashAndReset()).ToLowerInvariant();
+            TotalChunkHash = KDriveChunk.ComputeTotalChunkHash(chunkHashes, algorithm);
         }
 
         /// <summary>

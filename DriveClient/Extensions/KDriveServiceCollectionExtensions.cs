@@ -16,6 +16,11 @@ namespace kDriveClient.Extensions
         /// Uses <see cref="IHttpClientFactory"/> for the underlying HTTP client.
         /// Upload bandwidth probing is deferred until the first upload (or call <see cref="KDriveClient.CreateAsync"/> yourself).
         /// </summary>
+        /// <remarks>
+        /// Registers a named HttpClient <c>kDrive</c> by default. If you set
+        /// <see cref="KDriveClientOptions.HttpClientName"/> to another value, register that named client yourself
+        /// (or keep the default name).
+        /// </remarks>
         public static IServiceCollection AddKDriveClient(
             this IServiceCollection services,
             Action<KDriveClientOptions> configure)
@@ -23,7 +28,14 @@ namespace kDriveClient.Extensions
             ArgumentNullException.ThrowIfNull(services);
             ArgumentNullException.ThrowIfNull(configure);
 
-            services.AddOptions<KDriveClientOptions>().Configure(configure);
+            services.AddOptions<KDriveClientOptions>()
+                .Configure(configure)
+                .Validate(o => !string.IsNullOrWhiteSpace(o.Token), "KDriveClientOptions.Token is required.")
+                .Validate(o => o.DriveId > 0, "KDriveClientOptions.DriveId must be a positive value.")
+                .Validate(o => o.BaseAddress is { IsAbsoluteUri: true }, "KDriveClientOptions.BaseAddress must be an absolute URI.")
+                .Validate(o => o.AccountId is null or > 0, "KDriveClientOptions.AccountId must be positive when set.")
+                .ValidateOnStart();
+
             services.AddHttpClient("kDrive")
                 .ConfigureHttpClient((sp, client) =>
                 {
@@ -43,10 +55,12 @@ namespace kDriveClient.Extensions
                     throw new InvalidOperationException("KDriveClientOptions.Token is required.");
                 if (options.DriveId <= 0)
                     throw new InvalidOperationException("KDriveClientOptions.DriveId must be a positive value.");
+                if (!options.BaseAddress.IsAbsoluteUri)
+                    throw new InvalidOperationException("KDriveClientOptions.BaseAddress must be an absolute URI.");
 
+                var clientName = string.IsNullOrWhiteSpace(options.HttpClientName) ? "kDrive" : options.HttpClientName;
                 var factory = sp.GetRequiredService<IHttpClientFactory>();
-                var http = factory.CreateClient(
-                    string.IsNullOrWhiteSpace(options.HttpClientName) ? "kDrive" : options.HttpClientName);
+                var http = factory.CreateClient(clientName);
                 http.BaseAddress ??= options.BaseAddress;
                 if (http.DefaultRequestHeaders.Authorization is null && !string.IsNullOrWhiteSpace(options.Token))
                 {

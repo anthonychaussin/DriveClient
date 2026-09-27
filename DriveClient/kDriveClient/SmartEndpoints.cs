@@ -61,6 +61,9 @@ namespace kDriveClient.kDriveClient
 
             selected ??= drives.FirstOrDefault(d => d.InMaintenance != true) ?? drives[0];
 
+            if (selected.Id != DriveId)
+                RebindDriveId(selected.Id);
+
             return new KDriveBootstrapContext
             {
                 AccountId = accountId,
@@ -172,6 +175,106 @@ namespace kDriveClient.kDriveClient
 
                 cursor = page.Cursor;
             }
+        }
+
+        /// <inheritdoc />
+        public IAsyncEnumerable<KDriveItem> EnumerateFavoritesAsync(KDriveListQuery? query = null, int pageSize = 200, CancellationToken ct = default)
+            => EnumerateByCursorAsync((q, token) => EndpointsService.GetFavoritesAsync(q, token), query, pageSize, ct);
+
+        /// <inheritdoc />
+        public IAsyncEnumerable<KDriveItem> EnumerateTrashAsync(KDriveListQuery? query = null, int pageSize = 200, CancellationToken ct = default)
+            => EnumerateByCursorAsync((q, token) => EndpointsService.GetTrashAsync(q, token), query, pageSize, ct);
+
+        /// <inheritdoc />
+        public IAsyncEnumerable<KDriveItem> EnumerateSharedAsync(KDriveListQuery? query = null, int pageSize = 200, CancellationToken ct = default)
+            => EnumerateByCursorAsync((q, token) => EndpointsService.GetSharedWithMeAsync(q, token), query, pageSize, ct);
+
+        /// <inheritdoc />
+        public async Task<Stream> BuildAndDownloadArchiveAsync(
+            IEnumerable<long> fileIds,
+            long? parentId = null,
+            IEnumerable<long>? exceptFileIds = null,
+            TimeSpan? timeout = null,
+            TimeSpan? interval = null,
+            CancellationToken ct = default)
+        {
+            ArgumentNullException.ThrowIfNull(fileIds);
+            var ids = fileIds as IList<long> ?? fileIds.ToList();
+            if (ids.Count == 0 && parentId is null)
+                throw new ArgumentException("Provide at least one file id or a parent directory id.", nameof(fileIds));
+
+            await EnsureDriveAwakeAsync(ct: ct).ConfigureAwait(false);
+            var built = await BuildArchiveAsync(ids, parentId, exceptFileIds, ct).ConfigureAwait(false);
+            var uuid = built?.Data?.Uuid;
+            if (string.IsNullOrWhiteSpace(uuid))
+                throw new InvalidOperationException("Archive build did not return a UUID.");
+
+            var deadline = DateTimeOffset.UtcNow + (timeout ?? TimeSpan.FromMinutes(10));
+            var delay = interval ?? TimeSpan.FromSeconds(2);
+            Exception? lastError = null;
+
+            while (true)
+            {
+                ct.ThrowIfCancellationRequested();
+                try
+                {
+                    return await DownloadArchiveAsync(uuid, ct).ConfigureAwait(false);
+                }
+                catch (Exception ex) when (ex is not OperationCanceledException)
+                {
+                    lastError = ex;
+                    if (DateTimeOffset.UtcNow >= deadline)
+                        throw new TimeoutException($"Timed out waiting for archive {uuid} to become available.", lastError);
+
+                    await Task.Delay(delay, ct).ConfigureAwait(false);
+                }
+            }
+        }
+
+        /// <inheritdoc />
+        public async Task<KDriveExternalImport> WaitForImportCompleteAsync(
+            long importId,
+            TimeSpan? timeout = null,
+            TimeSpan? interval = null,
+            CancellationToken ct = default)
+        {
+            var result = await WaitForAsyncResultAsync(
+                async token =>
+                {
+                    var response = await GetImportJobAsync(importId, token).ConfigureAwait(false);
+                    return response?.Data;
+                },
+                import =>
+                {
+                    var status = import.Status ?? string.Empty;
+                    return status is not ("done" or "failed" or "canceled");
+                },
+                timeout,
+                interval,
+                ct).ConfigureAwait(false);
+
+            if (result is null)
+                throw new InvalidOperationException($"Import job {importId} was not found.");
+
+            return result;
+        }
+
+        /// <inheritdoc />
+        public async Task<KDriveExternalImport> CopyBetweenDrivesAsync(
+            long destinationDirectoryId,
+            long sourceDriveId,
+            long sourceFileId,
+            TimeSpan? timeout = null,
+            TimeSpan? interval = null,
+            CancellationToken ct = default)
+        {
+            await EnsureDriveAwakeAsync(ct: ct).ConfigureAwait(false);
+            var started = await CopyFileToDriveAsync(destinationDirectoryId, sourceDriveId, sourceFileId, ct).ConfigureAwait(false);
+            var job = started?.Data?.FirstOrDefault();
+            if (job?.Id is null or <= 0)
+                throw new InvalidOperationException("Copy-to-drive did not return an import job id.");
+
+            return await WaitForImportCompleteAsync(job.Id.Value, timeout, interval, ct).ConfigureAwait(false);
         }
 
         /// <inheritdoc />
@@ -555,6 +658,36 @@ namespace kDriveClient.kDriveClient
 
         private Task<KDriveNavigatorResponse<KDriveFileSystemItem>?> SearchItemsAsyncDto(KDriveListQuery? query, CancellationToken ct)
             => EndpointsService.SearchItemsAsync(query, ct);
+
+        private async IAsyncEnumerable<KDriveItem> EnumerateByCursorAsync(
+            Func<KDriveListQuery, CancellationToken, Task<KDriveNavigatorResponse<KDriveFileSystemItem>?>> fetchPage,
+            KDriveListQuery? query,
+            int pageSize,
+            [EnumeratorCancellation] CancellationToken ct)
+        {
+            ArgumentOutOfRangeException.ThrowIfNegativeOrZero(pageSize);
+            await EnsureDriveAwakeAsync(ct: ct).ConfigureAwait(false);
+            string? cursor = null;
+
+            while (true)
+            {
+                var q = CloneListQuery(query);
+                q.Limit = pageSize;
+                q.Cursor = cursor;
+
+                var page = await fetchPage(q, ct).ConfigureAwait(false);
+                if (page is null || page.Data.Count == 0)
+                    yield break;
+
+                foreach (var item in KDriveItem.FromMany(page.Data))
+                    yield return item;
+
+                if (page.HasMore != true || string.IsNullOrWhiteSpace(page.Cursor))
+                    yield break;
+
+                cursor = page.Cursor;
+            }
+        }
 
         private async Task<IReadOnlyList<KDriveFileSystemItem>> GetAllItemsByCursorAsync(
             Func<KDriveListQuery, CancellationToken, Task<KDriveNavigatorResponse<KDriveFileSystemItem>?>> fetchPage,

@@ -157,7 +157,40 @@ namespace kDriveClient.Models.Domain
         Version = 1 << 6,
 
         /// <summary>Include conversion capabilities.</summary>
-        Conversion = 1 << 7
+        Conversion = 1 << 7,
+
+        /// <summary>Include content hash.</summary>
+        Hash = 1 << 8,
+
+        /// <summary>Include etag.</summary>
+        Etag = 1 << 9,
+
+        /// <summary>Include activity summary.</summary>
+        Activity = 1 << 10,
+
+        /// <summary>Include lock information.</summary>
+        Lock = 1 << 11,
+
+        /// <summary>Include favorite flag.</summary>
+        IsFavorite = 1 << 12,
+
+        /// <summary>Include teams related to the item.</summary>
+        Teams = 1 << 13,
+
+        /// <summary>Include parent chain.</summary>
+        Parents = 1 << 14,
+
+        /// <summary>Include supported_by metadata.</summary>
+        SupportedBy = 1 << 15,
+
+        /// <summary>Include external import metadata.</summary>
+        ExternalImport = 1 << 16,
+
+        /// <summary>Include rewind metadata.</summary>
+        Rewind = 1 << 17,
+
+        /// <summary>Include sorted display name.</summary>
+        SortedName = 1 << 18
     }
 
     /// <summary>
@@ -280,7 +313,18 @@ namespace kDriveClient.Models.Domain
             if (includes.HasFlag(KDriveItemIncludes.ShareLink)) parts.Add("sharelink");
             if (includes.HasFlag(KDriveItemIncludes.Dropbox)) parts.Add("dropbox");
             if (includes.HasFlag(KDriveItemIncludes.Version)) parts.Add("version");
-            if (includes.HasFlag(KDriveItemIncludes.Conversion)) parts.Add("conversion");
+            if (includes.HasFlag(KDriveItemIncludes.Conversion)) parts.Add("conversion_capabilities");
+            if (includes.HasFlag(KDriveItemIncludes.Hash)) parts.Add("hash");
+            if (includes.HasFlag(KDriveItemIncludes.Etag)) parts.Add("etag");
+            if (includes.HasFlag(KDriveItemIncludes.Activity)) parts.Add("activity");
+            if (includes.HasFlag(KDriveItemIncludes.Lock)) parts.Add("lock");
+            if (includes.HasFlag(KDriveItemIncludes.IsFavorite)) parts.Add("is_favorite");
+            if (includes.HasFlag(KDriveItemIncludes.Teams)) parts.Add("teams");
+            if (includes.HasFlag(KDriveItemIncludes.Parents)) parts.Add("parents");
+            if (includes.HasFlag(KDriveItemIncludes.SupportedBy)) parts.Add("supported_by");
+            if (includes.HasFlag(KDriveItemIncludes.ExternalImport)) parts.Add("external_import");
+            if (includes.HasFlag(KDriveItemIncludes.Rewind)) parts.Add("rewind");
+            if (includes.HasFlag(KDriveItemIncludes.SortedName)) parts.Add("sorted_name");
             return parts.Count == 0 ? null : string.Join(",", parts);
         }
 

@@ -28,6 +28,9 @@ namespace kDriveClient.Helpers
             return new TempFileStream(path);
         }
 
+        /// <summary>Opens an existing temp file that will be deleted on dispose.</summary>
+        public static TempFileStream OpenExisting(string path) => new(path);
+
         protected override void Dispose(bool disposing)
         {
             if (Interlocked.Exchange(ref _disposed, 1) != 0)
